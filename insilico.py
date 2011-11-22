@@ -37,9 +37,9 @@ def main():
    
    con.close()
 
-   tbl = averageHeights("".join(pyro_dis_seq), sdata)
-   
    (phcomps, stdDevs) = getPeakHeightCompensations()
+   
+   tbl = averageHeights(pyro_dis_seq, sdata, phcomps, stdDevs)
    
 #   graph(opts, tbl, phcomps)
 
@@ -122,10 +122,25 @@ def getPeakHeightCompensations():
       sum = 0
       for h in phc_dict[key]:
          sum += math.pow((h - avgNucs[ph_nuc]), 2)
-      sum /= nsamps
+      avg = sum / nsamps
       
-      stdDev_Nucs[ph_nuc] = math.sqrt(sum)
-
+      stdDev_Nucs[ph_nuc] = math.sqrt(avg)
+      
+      # No longer need the list for the dictionary entry ph_nuc
+      phc_dict[ph_nuc] = []
+      # Add in the average found (should be the only element in the list)
+      phc_dict[ph_nuc].append(avg)
+   
+   # Temp store all averages
+   phcA = phc_dict['A']
+   phcT = phc_dict['T']
+   phcC = phc_dict['C']
+   phcG = phc_dict['G']
+   
+   # Convert phc_dict to a dictionary of Nucleotides to their average comp peak heights
+   phc_dict = {'A': phcA, 'T': phcT, 'G': phcG, 'C': phcC}
+   
+   print phc_dict
    print stdDev_Nucs
       
    return (phc_dict, stdDev_Nucs)
@@ -184,9 +199,9 @@ def getPyroDispensationSeq():
 
    cur.close()
 
-def avgHeights(table, dispSeq, smpl):
+def avgHeights(table, dispSeq, smpl, unitHeights, stdDev):
    for idx in range(0, len(smpl)):
-      letter = dispSeq[idx]
+      letter = dispSeq[idx%len(dispSeq)]
       try:
          currAvg = table[dispSeq][idx][letter][HEIGHT] # current average
          totalSeen = table[dispSeq][idx][letter][SEEN] # total number of values counted      
@@ -195,18 +210,20 @@ def avgHeights(table, dispSeq, smpl):
          totalSeen = 0
   
       totalVal = currAvg * totalSeen # undo averaging
-      currAvg = (totalVal + smpl[idx]) / (totalSeen + 1) # add a height and average
+      numNucleotides = round(smpl[idx]/unitHeights[letter])
+      calcUnitAvg = smpl[idx]/numNucleotides
+      if (abs(calcUnitAvg - unitHeights[letter]) > stdDev[letter]):
+         numNucleotides = numNucleotides - 1
+      currAvg = (totalVal + smpl[idx]/numNuc) / (totalSeen + numNucleotides) # add a height and average
       # Update values in list  
-      try:
-         table[dispSeq][idx][letter][HEIGHT] = currAvg 
-         table[dispSeq][idx][letter][SEEN] = totalSeen + 1
-      except (KeyError):
-         print table[dispSeq]
+
+      table[dispSeq][idx][letter][HEIGHT] = currAvg 
+      table[dispSeq][idx][letter][SEEN] = totalSeen + numNucleotides
 
 # Takes in a generated pyroprint and keeps a running average of the heights in
 # a given slot for a given dispensation sequence 
 # @param pyroprint - a tuple containing lists of the dispensation seq and the height
-def averageHeights(dispSeq="GATCGTAC", sampleList=[]):
+def averageHeights(dispSeq="GATCGTAC", sampleList=[], unitHeights, stdDev):
    dispIdx = 0
 
    dataFile = open("pyroprintTrends.pkl", "wb+") # load the persistent averages
@@ -216,7 +233,7 @@ def averageHeights(dispSeq="GATCGTAC", sampleList=[]):
       table = {}   
 
    for sample in sampleList:
-      avgHeights(table, dispSeq, sample)
+      avgHeights(table, dispSeq, sample, unitHeights, stdDev)
          
    cPickle.dump(table, dataFile) # write out the changes
    print("Average heights recomputed based on new data and written to file!\n")
