@@ -9,6 +9,7 @@ import pyroPrint
 import cPickle
 
 DEFAULT_SLOTS = 4000 # Default "length" of pyroprints to keep track of
+DEFAULT_SAMPLE_SIZE = 200
 SEEN = 1 # constant for the index of the "seen" count (used in average)
 HEIGHT = 0 # constant for the index of the average height of the pyroprint
 DISP = 0 # constant for the index of the dispensation seq in the pyroprint struct
@@ -21,27 +22,28 @@ guser = 'csc570'
 gpasswd = 'ilovedata570'
 gdb_name = 'cplop'
 primer_len = 14
-hist_ds_name = 'CCTCTACTAGAGCG20(TCGA)TT'
+short_disp = 'CCTCTACTAGAGCG20(TCGA)TT'
 pyro_ds_name = "ModTCGA-2c"
-pyro_dis_seq = []
+global pyro_dis_seq = []
 number_samples = 20
-num_opts = 7
+global num_opts = 7
+opteron_size = 103
 
 def main():
    global con
    con = pymysql.connect(host = ghost, port = gport, user = guser, passwd = gpasswd, db = gdb_name)
-   
+
    opts = parseData(sys.argv[1])
    getPyroDispensationSeq()
    sdata = getSampleData()
-   
-   con.close()
 
    (phcomps, stdDevs) = getPeakHeightCompensations()
-   
+   con.close()
+
    tbl = averageHeights(pyro_dis_seq, sdata, phcomps, stdDevs)
-   
-#   graph(opts, tbl, phcomps)
+   printTable(tbl)
+
+   graph(opts, tbl, pyro_dis_seq)
 
 def parseData(filename):
     global num_opts
@@ -57,15 +59,15 @@ def parseData(filename):
     for opt in fileInput :
         opt = opt.strip()
         # IF the string is not an empty string
-        if len(opt) > 0 : 
+        if len(opt) > 0 :
             # IF this is an opteron
             if  opt[0] != '#' :
                 # Add to the list
                 optList.append(opt)
                 num_opts += 1
-   
+
     return optList
-   
+
 def getPeakHeightCompensations():
    nsamps = number_samples * 20
    phc_dict = {"A" : [], "T" : [], "C" : [], "G" : []}
@@ -73,21 +75,21 @@ def getPeakHeightCompensations():
 
    sql = "SELECT DISTINCT H.pyroId FROM Histograms as H"
    sql += " JOIN Pyroprints as P ON (H.pyroId = P.pyroId) "
-   sql += "WHERE dsName = '" + hist_ds_name + "'"
+   sql += "WHERE dsName = '" + short_disp + "'"
 
    cur = con.cursor()
 
    cur.execute(sql)
-   
+
    pyroids = []
    for (r,) in cur:
       pyroids.append(int(r))
 
    plen = len(pyroids) - 1
 
-   for i in range(nsamps):      
+   for i in range(nsamps):
       pid = pyroids[random.randint(0, plen)]
-      
+
       while pid in samplePyroIds:
          pid = pyroids[random.randint(0, plen)]
 
@@ -123,26 +125,23 @@ def getPeakHeightCompensations():
       for h in phc_dict[key]:
          sum += math.pow((h - avgNucs[ph_nuc]), 2)
       avg = sum / nsamps
-      
+
       stdDev_Nucs[ph_nuc] = math.sqrt(avg)
-      
+
       # No longer need the list for the dictionary entry ph_nuc
       phc_dict[ph_nuc] = []
       # Add in the average found (should be the only element in the list)
       phc_dict[ph_nuc].append(avg)
-   
+
    # Temp store all averages
    phcA = phc_dict['A']
    phcT = phc_dict['T']
    phcC = phc_dict['C']
    phcG = phc_dict['G']
-   
+
    # Convert phc_dict to a dictionary of Nucleotides to their average comp peak heights
    phc_dict = {'A': phcA, 'T': phcT, 'G': phcG, 'C': phcC}
-   
-   print phc_dict
-   print stdDev_Nucs
-      
+
    return (phc_dict, stdDev_Nucs)
 
 def getSampleData():
@@ -150,21 +149,21 @@ def getSampleData():
    samplePyroIds = []
    cur = con.cursor()
    sql = "SELECT DISTINCT H.pyroId FROM Histograms as H"
-   sql += " JOIN Pyroprints as P ON (H.pyroId = P.pyroId) " 
-   sql += "WHERE dsName = '" + hist_ds_name + "'"
- 
+   sql += " JOIN Pyroprints as P ON (H.pyroId = P.pyroId) "
+   sql += "WHERE dsName = '" + short_disp + "'"
+
    cur.execute(sql)
 
    rws = cur.fetchall()
-   pyroids = [] 
+   pyroids = []
    for (r,) in rws:
       pyroids.append(int(r))
-   
+
    plen = len(pyroids) - 1
 
    for i in range(number_samples):
       pid = pyroids[random.randint(0, plen)]
-      
+
       while pid in samplePyroIds:
          pid = pyroids[random.randint(0, plen)]
 
@@ -188,10 +187,10 @@ def getSampleData():
 def getPyroDispensationSeq():
    global pyro_dis_seq
    sql = "SELECT dispSeq FROM Dispensation WHERE dsName = '" + pyro_ds_name + "'"
-   
+
    cur = con.cursor()
    cur.execute(sql)
-   
+
    tmp, = cur.fetchone()
 
    for c in tmp:
@@ -199,51 +198,102 @@ def getPyroDispensationSeq():
 
    cur.close()
 
+def printTable(table):
+   print("Disp Seq Table\n")
+
+   for dispSeq in table:
+      print("| "+dispSeq+" : ")
+      for i in range(len(table[dispSeq])):
+         print(" | "+str(table[dispSeq][i])+" | ")
+      print("\n")
+
+def blankSlot():
+   heightEntry = [0,0]
+   return {"A": heightEntry, "G": heightEntry, "C": heightEntry, "T": heightEntry}
+
+def createTableEntry():
+   entry = []
+   for i in range(DEFAULT_SAMPLE_SIZE):
+      entry.append(blankSlot())
+   return entry
+
 def avgHeights(table, dispSeq, smpl, unitHeights, stdDev):
-   for idx in range(0, len(smpl)):
+   dSeq = "".join(dispSeq)
+
+   for idx in range(len(smpl)):
       letter = dispSeq[idx%len(dispSeq)]
-      try:
-         currAvg = table[dispSeq][idx][letter][HEIGHT] # current average
-         totalSeen = table[dispSeq][idx][letter][SEEN] # total number of values counted      
-      except (KeyError):
+      if dSeq in table:
+         currAvg = table[dSeq][idx][letter][HEIGHT] # current average
+         totalSeen = table[dSeq][idx][letter][SEEN] # total number of values counted
+      else:
          currAvg = 0
          totalSeen = 0
-  
+         table[dSeq] = createTableEntry()
+
       totalVal = currAvg * totalSeen # undo averaging
       numNucleotides = round(smpl[idx]/unitHeights[letter])
       calcUnitAvg = smpl[idx]/numNucleotides
       if (abs(calcUnitAvg - unitHeights[letter]) > stdDev[letter]):
          numNucleotides = numNucleotides - 1
       currAvg = (totalVal + smpl[idx]/numNuc) / (totalSeen + numNucleotides) # add a height and average
-      # Update values in list  
-
-      table[dispSeq][idx][letter][HEIGHT] = currAvg 
+      # Update values in list
+      table[dispSeq][idx][letter][HEIGHT] = currAvg
       table[dispSeq][idx][letter][SEEN] = totalSeen + numNucleotides
 
 # Takes in a generated pyroprint and keeps a running average of the heights in
-# a given slot for a given dispensation sequence 
+# a given slot for a given dispensation sequence
 # @param pyroprint - a tuple containing lists of the dispensation seq and the height
-def averageHeights(dispSeq="GATCGTAC", sampleList=[], unitHeights, stdDev):
+def averageHeights(dispSeq, sampleList, unitHeights, stdDev):
    dispIdx = 0
 
    dataFile = open("pyroprintTrends.pkl", "wb+") # load the persistent averages
    try:
       table = cPickle.load(dataFile)
    except (EOFError, IOError): # file doesn't exist or is in wrong format
-      table = {}   
+      table = {}
 
    for sample in sampleList:
       avgHeights(table, dispSeq, sample, unitHeights, stdDev)
-         
+
    cPickle.dump(table, dataFile) # write out the changes
    print("Average heights recomputed based on new data and written to file!\n")
 
    return table
 
+def graph(opterons, tbl, pyro_dis_seq):
+    dispSeq = [T, C, G, A]
+    outputList = []
+    fd = open("pyroprint.out", "w")
 
-# def graph(opterons, phcomps):
-   
+    # FOR each position
+    for i in range(0, opteron_size) :
 
+        # Declare a nucleotide counter
+        nucleotidesCounted = 0
+
+        # Get the next nucleotide from the dispensation sequence
+        dispSeqNuc = dispSeq[i % 4]
+
+        # FOR each opteron
+        for opt in opterons :
+            # Set a temporary index to the current position (i.e. i)
+            j = i
+
+            # WHILE each nucleotide matches the dispSeqNucleotide
+            while opt[j] == dispSeqNuc :
+                # Increment the number of nucleotides counted
+                nucleotidesCounted += 1
+                # Move the temporary index ahead one position
+                j += 1
+
+        # Multiply the number of nucelotides counted by the comp. peak height
+        ph = tbl[pyro_dis_seq][i][dispSeqNuc][HEIGHT] * nucleotidesCounted
+
+        # Add a tuple to the output list in format: (position, dispensation nucleotide, peak height value)
+        outputList.append( str(i) + ", " +  dispSeqNuc + ", "  + str(ph) )
+
+    # Dump contents into an output file
+    cPickle.dump(outputList, fd)
 
 if __name__ == "__main__":
    main()
