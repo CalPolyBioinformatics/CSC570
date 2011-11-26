@@ -21,7 +21,7 @@
 import sys
 import os
 #import itertools
-#import pearsonr
+import scipy.stats
 
 # Define a main() function that prints a little greeting.
 def main():
@@ -94,11 +94,15 @@ def main():
       break
   
   lastPyroprint = 0 ;
-  for onePyroPrints in allPyroPrints:
+  for i in range(0, len(allPyroPrints)):
+    # for onePyroPrints in allPyroPrints:
     #if numCombos%1000 = 0 
-    #print pearsonr(onePyroPrints,lastPyroprint)
-    lastPyroprint = onePyroPrints
-    print onePyroPrints
+    #print scipy.stats.pearsonr(onePyroPrints,lastPyroprint)
+    print len(allPyroPrints[i])
+    #print len(allPyroprints[i+1])
+    #print "onePyroPrint + lastPyroPrint"
+    #lastPyroprint = onePyroPrints
+    #print onePyroPrints
 #print numCombos%1000
 #print(numCombos)
 
