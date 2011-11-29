@@ -20,8 +20,12 @@
 
 import sys
 import os
-#import itertools
-import scipy.stats
+import itertools
+from scipy.stats.stats import pearsonr
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.mlab as mlab
+
 
 # Define a main() function that prints a little greeting.
 def main():
@@ -63,6 +67,7 @@ def main():
       #get next 104 chars
       seqList.append(sequence[primerLoc+20:primerLoc+20+104])
   uniqueSequences = []
+  numUniqueSeq = 0
   #find unique strings
   for oneSeq in seqList:
     #print("OneSeq::")
@@ -70,45 +75,100 @@ def main():
     if oneSeq not in uniqueSequences:
       #print("found non unique seq:")
       #print(oneSeq)
+      numUniqueSeq = numUniqueSeq + 1
       uniqueSequences.append(oneSeq)
+  
   # else:
   #uniqueSequences.append(oneSeq)
-  
+  print 'num unique seq:'
+  print numUniqueSeq
   #print uniqueSequences
   allCombinations = combinations_with_replacement(uniqueSequences,7)
+  #allCombinations = itertools.combinations_with_replacement(uniqueSequences,7)
   #print ("Number of Unique Combinations: " + len(allCombinations))
   #print(len(allCombinations))
   numCombos = 0
   allPyroPrints = []
   
   #print(getIterLength(allCombinations))
-  
+
   for oneCombo in allCombinations:
     allPyroPrints.append(pyroprintData(oneCombo))
     numCombos = numCombos +1
     #print('numCombos')
-    moduloResults = numCombos%100
+    moduloResults = numCombos%1000    
     if moduloResults ==0:
       print numCombos
-    if numCombos > 1000:
+    if numCombos > 10000:
       break
+      
+  allPCorrs = [] 
+  smallestPCor = 1000 
+  largestPCor = 0 
   
-  lastPyroprint = 0 ;
-  for i in range(0, len(allPyroPrints)):
+  for i in range(0, len(allPyroPrints)-1):
     # for onePyroPrints in allPyroPrints:
     #if numCombos%1000 = 0 
     #print scipy.stats.pearsonr(onePyroPrints,lastPyroprint)
-    print len(allPyroPrints[i])
-    #print len(allPyroprints[i+1])
-    #print "onePyroPrint + lastPyroPrint"
-    #lastPyroprint = onePyroPrints
-    #print onePyroPrints
-#print numCombos%1000
-#print(numCombos)
+    #print "New Pyroprints"
+    #print len(allPyroPrints[i])
+    #print len(allPyroPrints[i+1])
+    if(len(allPyroPrints[i]) == len(allPyroPrints[i+1])):
+      currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[i+1])[0]
+      if(currPearsonR < smallestPCor):
+          smallestPCor = currPearsonR
+      if(currPearsonR > largestPCor):
+          largestPCor = currPearsonR
+    allPCorrs.append(currPearsonR)  
+  print allPCorrs
 
-#print(numCombos)
-# for i in range(0, 100):
-# print(allCombinations[0])
+
+
+
+  mu, sigma = 100, 15
+  #x = mu + sigma * np.random.randn(10000)
+  x = allPCorrs
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+
+  # the histogram of the data
+  #n, bins, patches = ax.hist(x, 50, normed=1, facecolor='green', alpha=0.75)
+  n, bins, patches = ax.hist(x)
+  # hist uses np.histogram under the hood to create 'n' and 'bins'.
+  # np.histogram returns the bin edges, so there will be 50 probability
+  # density values in n, 51 bin edges in bins and 50 patches.  To get
+  # everything lined up, we'll compute the bin centers
+  bincenters = 0.5*(bins[1:]+bins[:-1])
+  # add a 'best fit' line for the normal PDF
+  y = mlab.normpdf( bincenters, mu, sigma)
+  l = ax.plot(bincenters, y, 'r--', linewidth=1)
+
+  ax.set_xlabel('Correlation Range')
+  ax.set_ylabel('Number of Correlation')
+  ax.set_title('Pearson Correlation of Data')
+  rangePearsonCor = largestPCor - smallestPCor
+  largestN = 0 ;
+  for i in range(0, len(n)):
+    print n[i]
+    if n[i] > largestN:
+      largestN = n[i] 
+  ax.set_xlim(smallestPCor - (.1*rangePearsonCor), largestPCor + (.1*rangePearsonCor))
+  ax.set_ylim(0, largestN*1.1)
+  ax.grid(True)
+
+  #plt.show()
+  fname = 'pyroprintHisto.png'
+  print 'Saving frame', fname
+  fig.savefig(fname)
+  #print "onePyroPrint + lastPyroPrint"
+    #lastPyroprint = onePyroPrints
+    #print onePyroPrints  
+  #print numCombos%1000
+  #print(numCombos)
+
+  #print(numCombos)
+  # for i in range(0, 100):
+  # print(allCombinations[0])
 
 
 #perform Pearson Corralation on pyroprints
@@ -120,25 +180,7 @@ def main():
 #Profit!
 
 def pyroprintData(oneCombo):
-  #for oneEle in oneCombo:
-  #print(oneEle)
-  #Open a file to make a pyroprint of the data
-  #fd = open('Genome Sequences/ecoli36cassettes/E.-coli-536-16s.txt')
-  #7 sequences will be stored here
-  #### sequence = ["", "", "", "", "", "", ""]
   sequence = oneCombo
-  #print("Sequence: ")
-  
-  #grab all the sequences from the file and close the file
-  #t=-1
-  # for line in fd:
-  #if ">" in line:
-  # t += 1
-  # sequence = sequence
-  #else:
-  # sequence[t] += line.replace("\r\r\n","")
-  # fd.close()
-  
   #Current disposition sequence (more can be added/changed)
   dispSeq = "ATCG"
   #Saved heights from all 7 sequences
