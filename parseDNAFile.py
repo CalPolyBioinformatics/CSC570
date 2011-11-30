@@ -5,17 +5,19 @@
 
 
 """
-  So far I have done:
+  So far we have done:
   Find all files with DNA info in DIR
   Parse all files and find all DNA Chunks
   in each chunk find the primer sequence (if it exists)
   store all the 104char segments after the primer
   find all unique sequences of 104char segments
   find all possible choose 7 combinations of unique sequences
-  TODO:
   generate pyroprints (python)
-  generate pyroprints (CUDA)
   compare pyroprints
+  Graph pyroprints
+  TODO:
+  generate pyroprints (CUDA)
+
   """
 
 import sys
@@ -26,11 +28,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import math
+import re 
 
 
+####CHANGE THESE VALUES TO CHANGE HOW THE PROGRAM RUNS
+###DIRECTORY WITH DATA FILES:
+#dataPath = 'Genome Sequences/ecoli36cassettes/'
+dataPath = 'Genome Sequences/rDNA plasmid sequences/23-5/'
+###PRIMER
+#16-23 primer GGAACCTGCGGTTGGATCAC
+#23-5 primer CGTGAGGCTTAACCTT
+#primerSequence = "GGAACCTGCGGTTGGATCAC"
+#primerSequence = "TTGGATCAC"
+primerSequence = "AACCTT"
 
+##Dispensation Sequence:
+dispSeq = "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"
 
 def main():
+  
   #TODO: Get Dispensation Seq from Command Line
   #Current disposition sequences (more can be added/changed)
   dispSeq = "ATCG"
@@ -40,35 +56,41 @@ def main():
   dispSeq2 = dispSeq2.upper()
   dispSeq3 = dispSeq3.upper()
   
-  
+   
   #Find all files in Dir
   #TODO: get Dir from command line arg
-  path = 'Genome Sequences/ecoli36cassettes/'
+  path = dataPath
   listing = os.listdir(path)
   allSequences =[]
   #TODO: parse both types of files. Cassettes and rDNA
   for infile in listing:
     #print "current file is: " + 'Genome Sequences/ecoli36cassettes/' + infile
     # Open File
-    f = open('Genome Sequences/ecoli36cassettes/' + infile)
+    f = open(dataPath + infile)
     #print("currentFile: "+infile)
+    text = f.read()
     substring = ""
-    for line in f:
-      if ">" in line:
-        #print("NewSection:")
-        allSequences.append(substring)
-        #print(entireFile)
-        substring = line
-      else:
+    if(text.find("ribosomal RNA")>0):
+      #print "ribo RNA"
+      for line in text:
+        if ">" in line:
+          #print("NewSection:")
+          allSequences.append(substring)
+          #print(entireFile)
+          substring = line
+        else:
+          substring += line.replace("\r\r\n","")
+          #print 'substring'
+          #print(substring)
+    else:
+      #print "NO ribo RNA"
+      for line in text:
         substring += line.replace("\r\r\n","")
-    #print(substring)
+      allSequences.append(substring)
     f.close()
-  #TODO: get Primer from Command Line Arg
-  #16-23 primer GGAACCTGCGGTTGGATCAC
-  #23-5 primer CGTGAGGCTTAACCTT
   
   seqList = []
-  primer = "GGAACCTGCGGTTGGATCAC"
+  primer = primerSequence
   
   for sequence in allSequences:
     #print("sequence" + sequence)
@@ -79,13 +101,13 @@ def main():
       #Current disposition
       dispCount = 0
       primerLoc = sequence.find(primer)
-      #print('Found Primer At:' + str(primerLoc))
+      print('Found Primer At:' + str(primerLoc))
       #print("Found Primer in Sequence:" + sequence[primerLoc:primerLoc+20])
       #print("Found Sequence after Primer:" + sequence[primerLoc+20:primerLoc+20+140])
       #get next 104 dispensations
-      while dispCount < len(dispSeq1):
+      while dispCount < len(dispSeq):
         #print sequence[primerLoc+20+seqCount], dispSeq1[dispCount], seqCount, dispCount
-        if sequence[primerLoc+20+seqCount] == dispSeq1[dispCount]:
+        if sequence[primerLoc+20+seqCount] == dispSeq[dispCount]:
           seqCount += 1
         elif (sequence[primerLoc+20+seqCount] != 'A') & (sequence[primerLoc+20+seqCount] != 'T') & (sequence[primerLoc+20+seqCount] != 'C') &(sequence[primerLoc+20+seqCount] != 'G'):
           seqCount += 1
@@ -94,7 +116,9 @@ def main():
             dispCount += 1
         seqList.append(sequence[primerLoc+20:primerLoc+20+seqCount])
         #seqList.append(sequence[primerLoc+20:primerLoc+20+104])
-  
+    else:
+      print 'No Primer'
+
   #find unique strings
   uniqueSequences = []
   for oneSeq in seqList:
@@ -112,7 +136,7 @@ def main():
     moduloResults = numCombos%100    
     if moduloResults ==0:
       print numCombos
-    if numCombos > 10:
+    if numCombos > 100:
       break
       
   allPCorrs = [] 
@@ -121,14 +145,14 @@ def main():
   print 'TRY TO FIND PEARSON CORS'
   for i in range(0, len(allPyroPrints)-1):
     for j in range(i+1,len(allPyroPrints)-1):
-      print 'allPyroPrints[i]'
+      '''print 'allPyroPrints[i]'
       print allPyroPrints[i]
       print 'allPyroPrints[j]'
       print allPyroPrints[j]
       print 'i'
       print i 
       print 'j'
-      print j 
+      print j''' 
       currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[j])[0]
       if(math.isnan(currPearsonR)!=True):
          if(currPearsonR < smallestPCor):
@@ -149,7 +173,7 @@ def main():
         if(currPearsonR > largestPCor):
           largestPCor = currPearsonR
       allPCorrs.append(currPearsonR)  '''
-  print allPCorrs
+#print allPCorrs
 
 
 
@@ -272,7 +296,38 @@ def getIterLength(iterator):
   result = len(temp)
   iterator = iter(temp)
   return result
+'''
+def expandDispSeq(dispSeq):
+  #cctctactagagcg20(tcga)tt
+  #aacacgcga23(gatc)gaa
+  #number_regex = re.compile('[0-9]*')
+  multiplier = ''
+  multStart = 0 
+  multEnd = 0
+  multSeq = ''
+  result = ''
+  p = re.compile('[0-9]+')
+  print p.findall(dispSeq)
+  print 'result'
+  print result
+  return result
 
+
+  for i in range(0, len(dispSeq)):
+    if dispSeq[i:i+1].isdigit():
+      multiplierStart = i 
+
+    
+  for char in dispSeq:
+    if char.isalpha():
+      result.append(char)
+    if char.isdigit():
+      multiplier.appent(char)
+    if char.expandDispSeq
+      print "Seq"
+  #TODO finish this code
+     ''' 
+  
 
 def combinations_with_replacement(iterable, r):
   # combinations_with_replacement('ABC', 2) --> AA AB AC BB BC CC
