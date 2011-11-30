@@ -25,14 +25,28 @@ from scipy.stats.stats import pearsonr
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
+import math
 
 
-# Define a main() function that prints a little greeting.
+
+
 def main():
+  #TODO: Get Dispensation Seq from Command Line
+  #Current disposition sequences (more can be added/changed)
+  dispSeq = "ATCG"
+  dispSeq1 = "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"
+  dispSeq2 = "aacacgcgagatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgaa"
+  dispSeq3 = "cctctactagagcgtcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatt"
+  dispSeq2 = dispSeq2.upper()
+  dispSeq3 = dispSeq3.upper()
+  
+  
   #Find all files in Dir
+  #TODO: get Dir from command line arg
   path = 'Genome Sequences/ecoli36cassettes/'
   listing = os.listdir(path)
   allSequences =[]
+  #TODO: parse both types of files. Cassettes and rDNA
   for infile in listing:
     #print "current file is: " + 'Genome Sequences/ecoli36cassettes/' + infile
     # Open File
@@ -49,7 +63,7 @@ def main():
         substring += line.replace("\r\r\n","")
     #print(substring)
     f.close()
-  #TODO: Parse Primer from file Primer.txt
+  #TODO: get Primer from Command Line Arg
   #16-23 primer GGAACCTGCGGTTGGATCAC
   #23-5 primer CGTGAGGCTTAACCTT
   
@@ -60,66 +74,81 @@ def main():
     #print("sequence" + sequence)
     #find primer
     if primer in sequence:
+      #Current sequence position
+      seqCount = 0
+      #Current disposition
+      dispCount = 0
       primerLoc = sequence.find(primer)
       #print('Found Primer At:' + str(primerLoc))
       #print("Found Primer in Sequence:" + sequence[primerLoc:primerLoc+20])
       #print("Found Sequence after Primer:" + sequence[primerLoc+20:primerLoc+20+140])
-      #get next 104 chars
-      seqList.append(sequence[primerLoc+20:primerLoc+20+104])
-  uniqueSequences = []
-  numUniqueSeq = 0
-  #find unique strings
-  for oneSeq in seqList:
-    #print("OneSeq::")
-    #print(oneSeq)
-    if oneSeq not in uniqueSequences:
-      #print("found non unique seq:")
-      #print(oneSeq)
-      numUniqueSeq = numUniqueSeq + 1
-      uniqueSequences.append(oneSeq)
+      #get next 104 dispensations
+      while dispCount < len(dispSeq1):
+        #print sequence[primerLoc+20+seqCount], dispSeq1[dispCount], seqCount, dispCount
+        if sequence[primerLoc+20+seqCount] == dispSeq1[dispCount]:
+          seqCount += 1
+        elif (sequence[primerLoc+20+seqCount] != 'A') & (sequence[primerLoc+20+seqCount] != 'T') & (sequence[primerLoc+20+seqCount] != 'C') &(sequence[primerLoc+20+seqCount] != 'G'):
+          seqCount += 1
+          dispCount += 1
+        else:
+            dispCount += 1
+        seqList.append(sequence[primerLoc+20:primerLoc+20+seqCount])
+        #seqList.append(sequence[primerLoc+20:primerLoc+20+104])
   
-  # else:
-  #uniqueSequences.append(oneSeq)
-  print 'num unique seq:'
-  print numUniqueSeq
-  #print uniqueSequences
+  #find unique strings
+  uniqueSequences = []
+  for oneSeq in seqList:
+    if oneSeq not in uniqueSequences:
+      uniqueSequences.append(oneSeq)
   allCombinations = combinations_with_replacement(uniqueSequences,7)
-  #allCombinations = itertools.combinations_with_replacement(uniqueSequences,7)
-  #print ("Number of Unique Combinations: " + len(allCombinations))
-  #print(len(allCombinations))
+  
+  #find all combinations
   numCombos = 0
   allPyroPrints = []
-  
-  #print(getIterLength(allCombinations))
-
   for oneCombo in allCombinations:
     allPyroPrints.append(pyroprintData(oneCombo))
     numCombos = numCombos +1
     #print('numCombos')
-    moduloResults = numCombos%1000    
+    moduloResults = numCombos%100    
     if moduloResults ==0:
       print numCombos
-    if numCombos > 10000:
+    if numCombos > 10:
       break
       
   allPCorrs = [] 
   smallestPCor = 1000 
   largestPCor = 0 
-  
+  print 'TRY TO FIND PEARSON CORS'
   for i in range(0, len(allPyroPrints)-1):
-    # for onePyroPrints in allPyroPrints:
-    #if numCombos%1000 = 0 
-    #print scipy.stats.pearsonr(onePyroPrints,lastPyroprint)
-    #print "New Pyroprints"
-    #print len(allPyroPrints[i])
-    #print len(allPyroPrints[i+1])
-    if(len(allPyroPrints[i]) == len(allPyroPrints[i+1])):
-      currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[i+1])[0]
-      if(currPearsonR < smallestPCor):
+    for j in range(i+1,len(allPyroPrints)-1):
+      print 'allPyroPrints[i]'
+      print allPyroPrints[i]
+      print 'allPyroPrints[j]'
+      print allPyroPrints[j]
+      print 'i'
+      print i 
+      print 'j'
+      print j 
+      currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[j])[0]
+      if(math.isnan(currPearsonR)!=True):
+         if(currPearsonR < smallestPCor):
+            smallestPCor = currPearsonR
+         if(currPearsonR > largestPCor):
+            largestPCor = currPearsonR
+         allPCorrs.append(currPearsonR)
+      # for onePyroPrints in allPyroPrints:
+      #if numCombos%1000 = 0 
+      #print scipy.stats.pearsonr(onePyroPrints,lastPyroprint)
+      #print "New Pyroprints"
+      #print len(allPyroPrints[i])
+      #print len(allPyroPrints[i+1])
+      '''if(len(allPyroPrints[i]) == len(allPyroPrints[i+1])):
+        currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[i+1])[0]
+        if(currPearsonR < smallestPCor):
           smallestPCor = currPearsonR
-      if(currPearsonR > largestPCor):
+        if(currPearsonR > largestPCor):
           largestPCor = currPearsonR
-    allPCorrs.append(currPearsonR)  
+      allPCorrs.append(currPearsonR)  '''
   print allPCorrs
 
 
@@ -160,29 +189,18 @@ def main():
   fname = 'pyroprintHisto.png'
   print 'Saving frame', fname
   fig.savefig(fname)
-  #print "onePyroPrint + lastPyroPrint"
-    #lastPyroprint = onePyroPrints
-    #print onePyroPrints  
-  #print numCombos%1000
-  #print(numCombos)
-
-  #print(numCombos)
-  # for i in range(0, 100):
-  # print(allCombinations[0])
-
-
-#perform Pearson Corralation on pyroprints
-
-#save all sequences
-
-#???
-
-#Profit!
 
 def pyroprintData(oneCombo):
   sequence = oneCombo
-  #Current disposition sequence (more can be added/changed)
+
+  #Current disposition sequences (more can be added/changed)
   dispSeq = "ATCG"
+  dispSeq1 = "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"
+  dispSeq2 = "aacacgcgagatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgaa"
+  dispSeq3 = "cctctactagagcgtcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatt"
+  dispSeq2 = dispSeq2.upper()
+  dispSeq3 = dispSeq3.upper() 
+  
   #Saved heights from all 7 sequences
   pyroData = [[],[],[],[],[],[],[]]
   #Final heights
@@ -195,6 +213,7 @@ def pyroprintData(oneCombo):
   pyroCount = 0
   #Length of sequences
   length = [len(sequence[0]), len(sequence[1]), len(sequence[2]), len(sequence[3]), len(sequence[4]), len(sequence[5]), len(sequence[6])]
+  #print len(sequence[0]), len(sequence[1]), len(sequence[2]), len(sequence[3]), len(sequence[4]), len(sequence[5]), len(sequence[6])
   
   #Sequence Counter
   t=0
@@ -202,18 +221,21 @@ def pyroprintData(oneCombo):
   #Go through the 7 sequences and run through the disposition sequence getting the heights
   while t < 7:
     while seqCount < length[t]:
-      if sequence[t][seqCount] == dispSeq[dispCount]:
+      #print sequence[t][seqCount], dispSeq1[dispCount]
+      if sequence[t][seqCount] == dispSeq1[dispCount]:
         pyroCount += 1
         seqCount += 1
+        if seqCount == length[t]:
+          pyroData[t].append(pyroCount)
       elif (sequence[t][seqCount] != 'A') & (sequence[t][seqCount] != 'T') & (sequence[t][seqCount] != 'C') & (sequence[t][seqCount] != 'G'):
         seqCount += 1
+        dispCount += 1
+        if seqCount == length[t]:
+          pyroData[t].append(pyroCount)
       else:
         pyroData[t].append(pyroCount)
         pyroCount = 0
-        if dispCount == 3:
-          dispCount = 0
-        else:
-          dispCount += 1
+        dispCount += 1
     seqCount = 0
     dispCount = 0
     pyroCount = 0
@@ -222,33 +244,27 @@ def pyroprintData(oneCombo):
   seqCount = 0
   #Get the max length of the heights (since they can be different - finish quicker/slower)
   maxVal = max(len(pyroData[0]),len(pyroData[1]),len(pyroData[2]),len(pyroData[3]),len(pyroData[4]),len(pyroData[5]),len(pyroData[6]))
+  #print len(pyroData[0]),len(pyroData[1]),len(pyroData[2]),len(pyroData[3]),len(pyroData[4]),len(pyroData[5]),len(pyroData[6])
+  
   
   #Pad the heights that do not have 0's that need them for adding
   x=0
   while x < 7:
     t = len(pyroData[x])
-    while (maxVal - t) > 0:
+    while (len(dispSeq1) - t) > 0:
       pyroData[x].append(0)
       t += 1
     x += 1
   
+  
   #Get the final heights
-  while seqCount < maxVal:
+  while seqCount < len(dispSeq1):
     height.append( int(pyroData[0][seqCount]) + int(pyroData[1][seqCount]) + int(pyroData[2][seqCount]) + int(pyroData[3][seqCount]) + int(pyroData[4][seqCount]) + int(pyroData[5][seqCount]) + int(pyroData[6][seqCount]))
     seqCount += 1
   
-  #Print out the heights
-  '''x=0
-    while x<len(height):
-    print x, dispSeq[dispCount], ':', height[x]
-    x += 1
-    if dispCount == 3:
-    dispCount = 0
-    else:
-    dispCount += 1
-    '''
-  #print height
-  #print '-->height'
+  
+  #print len(height)
+  
   return height
 
 def getIterLength(iterator):
