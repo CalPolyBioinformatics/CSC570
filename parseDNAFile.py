@@ -30,13 +30,6 @@ import matplotlib.mlab as mlab
 import math
 import re 
 from optparse import OptionParser
-#Parse Command line
-parser = parser = OptionParser()
-parser.add_option("-d", "--dir", dest="dir", default="Genome Sequences/rDNA plasmid sequences/23-5/")
-
-(options, args) = parser.parse_args()
-dataPath = options.dir
-
 
 ####CHANGE THESE VALUES TO CHANGE HOW THE PROGRAM RUNS
 ###DIRECTORY WITH DATA FILES:
@@ -48,55 +41,56 @@ dataPath = options.dir
 primerSequence = "AACCTT"
 
 ##Dispensation Sequence:
-dispSeq = "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"
+#23-5 AACACGCGA23(GATC)GAA
+#16-23 CCTCTACTAGAGCG20(TCGA)TT
 
 def main():
   
-  #TODO: Get Dispensation Seq from Command Line
-  #Current disposition sequences (more can be added/changed)
-  dispSeq = "ATCG"
-  dispSeq1 = "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"
-  dispSeq2 = "aacacgcgagatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgaa"
-  dispSeq3 = "cctctactagagcgtcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatt"
-  dispSeq2 = dispSeq2.upper()
-  dispSeq3 = dispSeq3.upper()
+  #Parse Command line
+  parser = OptionParser()
+  parser.add_option("-p", "--path", dest="dir", default="Genome Sequences/rDNA plasmid sequences/23-5/")
+  parser.add_option("-d", dest="DisSeq", default="AACACGCGA23(GATC)GAA")
+  parser.add_option("--max", dest="max", type="int", default=-1)
+
+  (options, args) = parser.parse_args()
+  dataPath = options.dir
+  comboLimit = options.max
   
-   
+  dispSeq = buildDispSeq(options.DisSeq)
+  
   #Find all files in Dir
-  #TODO: get Dir from command line arg
   path = dataPath
   listing = os.listdir(path)
   allSequences =[]
   #TODO: parse both types of files. Cassettes and rDNA
+  
+  print "Fetching Files"
+  
   for infile in listing:
     #print "current file is: " + 'Genome Sequences/ecoli36cassettes/' + infile
     # Open File
-    f = open(dataPath + infile)
-    #print("currentFile: "+infile)
-    text = f.read()
-    substring = ""
-    if(text.find("ribosomal RNA")>0):
-      #print "ribo RNA"
-      for line in text:
-        if ">" in line:
-          #print("NewSection:")
-          allSequences.append(substring)
-          #print(entireFile)
-          substring = line
+    with open(dataPath + infile) as f:
+        text = f.read()
+        substring = ""
+
+        if(text.find("ribosomal RNA")>0):
+            for line in text:
+       	        if ">" in line:
+                    allSequences.append(substring)
+                    substring = line
+                else:
+                    substring += line.replace("\r\r\n","")
         else:
-          substring += line.replace("\r\r\n","")
-          #print 'substring'
-          #print(substring)
-    else:
-      #print "NO ribo RNA"
-      for line in text:
-        substring += line.replace("\r\r\n","")
-      allSequences.append(substring)
-    f.close()
+      	    for line in text:
+              substring += line.replace("\r\r\n","")
+
+      	    allSequences.append(substring)
   
   seqList = []
   primer = primerSequence
   
+  print "Generating Sequences"
+
   for sequence in allSequences:
     #print("sequence" + sequence)
     #find primer
@@ -110,6 +104,7 @@ def main():
       #print("Found Primer in Sequence:" + sequence[primerLoc:primerLoc+20])
       #print("Found Sequence after Primer:" + sequence[primerLoc+20:primerLoc+20+140])
       #get next 104 dispensations
+
       while dispCount < len(dispSeq):
         #print sequence[primerLoc+20+seqCount], dispSeq1[dispCount], seqCount, dispCount
         if sequence[primerLoc+20+seqCount] == dispSeq[dispCount]:
@@ -129,23 +124,28 @@ def main():
       uniqueSequences.append(oneSeq)
   allCombinations = combinations_with_replacement(uniqueSequences,7)
   
+  print "Pryoprinting Sequences"
+
   #find all combinations
   numCombos = 0
   allPyroPrints = []
+
   for oneCombo in allCombinations:
-    allPyroPrints.append(pyroprintData(oneCombo))
-    numCombos = numCombos +1
-    #print('numCombos')
-    moduloResults = numCombos%100    
-    if moduloResults == 0:
-      print numCombos
-    if numCombos > 100:
-      break
-      
+
+    if comboLimit > 0 and numCombos >= comboLimit:
+        break 
+
+    allPyroPrints.append(pyroprintData(oneCombo, dispSeq))
+    numCombos += 1
+
+  print str(numCombos) + " Pryoprints Generated"
+  
   allPCorrs = [] 
   smallestPCor = 1000 
   largestPCor = 0 
-  print 'TRY TO FIND PEARSON CORS'
+
+  print 'Calculating Pearson Correlation'
+
   for i in range(0, len(allPyroPrints)-1):
     for j in range(i+1,len(allPyroPrints)-1):
       '''print 'allPyroPrints[i]'
@@ -233,16 +233,8 @@ def buildDispSeq(seqExp):
 
 	return complete
 
-def pyroprintData(oneCombo):
+def pyroprintData(oneCombo, dispSeq):
   sequence = oneCombo
-
-  #Current disposition sequences (more can be added/changed)
-  dispSeq = "ATCG"
-  dispSeq1 = "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG"
-  dispSeq2 = "aacacgcgagatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgaa"
-  dispSeq3 = "cctctactagagcgtcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatcgatt"
-  dispSeq2 = dispSeq2.upper()
-  dispSeq3 = dispSeq3.upper() 
   
   #Saved heights from all 7 sequences
   pyroData = [[],[],[],[],[],[],[]]
@@ -256,8 +248,6 @@ def pyroprintData(oneCombo):
   pyroCount = 0
   #Length of sequences
   length = [len(sequence[0]), len(sequence[1]), len(sequence[2]), len(sequence[3]), len(sequence[4]), len(sequence[5]), len(sequence[6])]
-  #print len(sequence[0]), len(sequence[1]), len(sequence[2]), len(sequence[3]), len(sequence[4]), len(sequence[5]), len(sequence[6])
-  
   #Sequence Counter
   t=0
   
@@ -265,7 +255,7 @@ def pyroprintData(oneCombo):
   while t < 7:
     while seqCount < length[t]:
       #print sequence[t][seqCount], dispSeq1[dispCount]
-      if sequence[t][seqCount] == dispSeq1[dispCount]:
+      if sequence[t][seqCount] == dispSeq[dispCount]:
         pyroCount += 1
         seqCount += 1
         if seqCount == length[t]:
@@ -294,14 +284,14 @@ def pyroprintData(oneCombo):
   x=0
   while x < 7:
     t = len(pyroData[x])
-    while (len(dispSeq1) - t) > 0:
+    while (len(dispSeq) - t) > 0:
       pyroData[x].append(0)
       t += 1
     x += 1
   
   
   #Get the final heights
-  while seqCount < len(dispSeq1):
+  while seqCount < len(dispSeq):
     height.append( int(pyroData[0][seqCount]) + int(pyroData[1][seqCount]) + int(pyroData[2][seqCount]) + int(pyroData[3][seqCount]) + int(pyroData[4][seqCount]) + int(pyroData[5][seqCount]) + int(pyroData[6][seqCount]))
     seqCount += 1
   
