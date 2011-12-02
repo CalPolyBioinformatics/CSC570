@@ -29,12 +29,17 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import math
 import re 
+from optparse import OptionParser
+#Parse Command line
+parser = parser = OptionParser()
+parser.add_option("-d", "--dir", dest="dir", default="Genome Sequences/rDNA plasmid sequences/23-5/")
+
+(options, args) = parser.parse_args()
+dataPath = options.dir
 
 
 ####CHANGE THESE VALUES TO CHANGE HOW THE PROGRAM RUNS
 ###DIRECTORY WITH DATA FILES:
-#dataPath = 'Genome Sequences/ecoli36cassettes/'
-dataPath = 'Genome Sequences/rDNA plasmid sequences/23-5/'
 ###PRIMER
 #16-23 primer GGAACCTGCGGTTGGATCAC
 #23-5 primer CGTGAGGCTTAACCTT
@@ -101,7 +106,7 @@ def main():
       #Current disposition
       dispCount = 0
       primerLoc = sequence.find(primer)
-      print('Found Primer At:' + str(primerLoc))
+      #print('Found Primer At:' + str(primerLoc))
       #print("Found Primer in Sequence:" + sequence[primerLoc:primerLoc+20])
       #print("Found Sequence after Primer:" + sequence[primerLoc+20:primerLoc+20+140])
       #get next 104 dispensations
@@ -116,8 +121,6 @@ def main():
             dispCount += 1
         seqList.append(sequence[primerLoc+20:primerLoc+20+seqCount])
         #seqList.append(sequence[primerLoc+20:primerLoc+20+104])
-    else:
-      print 'No Primer'
 
   #find unique strings
   uniqueSequences = []
@@ -134,7 +137,7 @@ def main():
     numCombos = numCombos +1
     #print('numCombos')
     moduloResults = numCombos%100    
-    if moduloResults ==0:
+    if moduloResults == 0:
       print numCombos
     if numCombos > 100:
       break
@@ -173,11 +176,8 @@ def main():
         if(currPearsonR > largestPCor):
           largestPCor = currPearsonR
       allPCorrs.append(currPearsonR)  '''
+
 #print allPCorrs
-
-
-
-
   mu, sigma = 100, 15
   #x = mu + sigma * np.random.randn(10000)
   x = allPCorrs
