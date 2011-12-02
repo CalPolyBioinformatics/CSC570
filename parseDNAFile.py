@@ -214,6 +214,25 @@ def main():
   print 'Saving frame', fname
   fig.savefig(fname)
 
+def buildDispSeq(seqExp):
+
+	seq = re.findall('[a-zA-Z]+|\d+\([a-zA-Z]+\)',seqExp)
+	
+	complete = ''
+	for item in seq:
+		if re.match('\d',item):
+			loopinfo = re.split('\(|\)',item)
+			count = int(loopinfo[0])
+			chars = loopinfo[1]
+			i = 0
+			while i < count:
+				complete += chars
+				i += 1
+		else:
+			complete += item
+
+	return complete
+
 def pyroprintData(oneCombo):
   sequence = oneCombo
 
