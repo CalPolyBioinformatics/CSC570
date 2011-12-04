@@ -26,6 +26,7 @@
 import sys
 import os
 import itertools
+import numpy
 from scipy.stats.stats import pearsonr
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,6 +34,20 @@ import matplotlib.mlab as mlab
 import math
 import re 
 from optparse import OptionParser
+
+# detect pycuda support
+cuda_support = False
+try:
+    import pycuda.autoinit
+    import pycuda.driver as cuda
+    import pycuda.compiler
+    import pycuda.gpuarray
+    print('PyCUDA detected.')
+    cuda_support = True
+except:
+    print('PyCUDA not detected. Calculating the Pearson correlation matrix for lots')
+    print('of strains might take... oh... a century or two. A real-life renactment')
+    print('of "99 Bottles of Beer on the Wall" is recommended to pass the time.')
 
 ####CHANGE THESE VALUES TO CHANGE HOW THE PROGRAM RUNS
 ###DIRECTORY WITH DATA FILES:
@@ -78,16 +93,16 @@ def main():
 
         if(text.find("ribosomal RNA")>0):
             for line in text:
-       	        if ">" in line:
+                if ">" in line:
                     allSequences.append(substring)
                     substring = line
                 else:
                     substring += line.replace("\r\r\n","")
         else:
-      	    for line in text:
+            for line in text:
               substring += line.replace("\r\r\n","")
 
-      	    allSequences.append(substring)
+            allSequences.append(substring)
   
   seqList = []
   primer = primerSequence
@@ -127,7 +142,7 @@ def main():
       uniqueSequences.append(oneSeq)
   allCombinations = combinations_with_replacement(uniqueSequences,7)
   
-  print "Pryoprinting Sequences"
+  print "Pyroprinting Sequences"
 
   #find all combinations
   numCombos = 0
@@ -141,7 +156,10 @@ def main():
     allPyroPrints.append(pyroprintData(oneCombo, dispSeq))
     numCombos += 1
 
-  print str(numCombos) + " Pryoprints Generated"
+    if numCombos % 1000 == 0:
+        print('%dk sequences...' % (numCombos / 1000))
+
+  print str(numCombos) + " Pyroprints Generated"
   
   allPCorrs = [] 
   smallestPCor = 1000 
@@ -149,36 +167,39 @@ def main():
 
   print 'Calculating Pearson Correlation'
 
-  for i in range(0, len(allPyroPrints)-1):
-    for j in range(i+1,len(allPyroPrints)-1):
-      '''print 'allPyroPrints[i]'
-      print allPyroPrints[i]
-      print 'allPyroPrints[j]'
-      print allPyroPrints[j]
-      print 'i'
-      print i 
-      print 'j'
-      print j''' 
-      currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[j])[0]
-      if(math.isnan(currPearsonR)!=True):
-         if(currPearsonR < smallestPCor):
+  if cuda_support:
+    cuda_pearson(allPyroPrints)
+  else:
+    for i in range(0, len(allPyroPrints)-1):
+      for j in range(i+1,len(allPyroPrints)-1):
+        '''print 'allPyroPrints[i]'
+        print allPyroPrints[i]
+        print 'allPyroPrints[j]'
+        print allPyroPrints[j]
+        print 'i'
+        print i 
+        print 'j'
+        print j''' 
+        currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[j])[0]
+        if(math.isnan(currPearsonR)!=True):
+           if(currPearsonR < smallestPCor):
+              smallestPCor = currPearsonR
+           if(currPearsonR > largestPCor):
+              largestPCor = currPearsonR
+           allPCorrs.append(currPearsonR)
+        # for onePyroPrints in allPyroPrints:
+        #if numCombos%1000 = 0 
+        #print scipy.stats.pearsonr(onePyroPrints,lastPyroprint)
+        #print "New Pyroprints"
+        #print len(allPyroPrints[i])
+        #print len(allPyroPrints[i+1])
+        '''if(len(allPyroPrints[i]) == len(allPyroPrints[i+1])):
+          currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[i+1])[0]
+          if(currPearsonR < smallestPCor):
             smallestPCor = currPearsonR
-         if(currPearsonR > largestPCor):
+          if(currPearsonR > largestPCor):
             largestPCor = currPearsonR
-         allPCorrs.append(currPearsonR)
-      # for onePyroPrints in allPyroPrints:
-      #if numCombos%1000 = 0 
-      #print scipy.stats.pearsonr(onePyroPrints,lastPyroprint)
-      #print "New Pyroprints"
-      #print len(allPyroPrints[i])
-      #print len(allPyroPrints[i+1])
-      '''if(len(allPyroPrints[i]) == len(allPyroPrints[i+1])):
-        currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[i+1])[0]
-        if(currPearsonR < smallestPCor):
-          smallestPCor = currPearsonR
-        if(currPearsonR > largestPCor):
-          largestPCor = currPearsonR
-      allPCorrs.append(currPearsonR)  '''
+        allPCorrs.append(currPearsonR)  '''
 
 #print allPCorrs
   mu, sigma = 100, 15
@@ -219,22 +240,22 @@ def main():
 
 def buildDispSeq(seqExp):
 
-	seq = re.findall('[a-zA-Z]+|\d+\([a-zA-Z]+\)',seqExp)
-	
-	complete = ''
-	for item in seq:
-		if re.match('\d',item):
-			loopinfo = re.split('\(|\)',item)
-			count = int(loopinfo[0])
-			chars = loopinfo[1]
-			i = 0
-			while i < count:
-				complete += chars
-				i += 1
-		else:
-			complete += item
+    seq = re.findall('[a-zA-Z]+|\d+\([a-zA-Z]+\)',seqExp)
+    
+    complete = ''
+    for item in seq:
+        if re.match('\d',item):
+            loopinfo = re.split('\(|\)',item)
+            count = int(loopinfo[0])
+            chars = loopinfo[1]
+            i = 0
+            while i < count:
+                complete += chars
+                i += 1
+        else:
+            complete += item
 
-	return complete
+    return complete
 
 def pyroprintData(oneCombo, dispSeq):
   sequence = oneCombo
@@ -359,6 +380,81 @@ def combinations_with_replacement(iterable, r):
     yield tuple(pool[i] for i in indices)
 
 
+def cuda_pearson(pyroprints):
+    print('Prepping data for CUDA')
+    kernel = pycuda.compiler.SourceModule('''
+        __global__ void pearson(int *buckets, int num_buckets, int *input, int n, int disp_len) {
+            // calculate absolute <i, j> coords within the matrix
+            int i = blockIdx.y * blockDim.y + threadIdx.y; // row
+            int j = blockIdx.x * blockDim.x + threadIdx.x; // column
+
+            // make sure this thread is inside the matrix
+            if (i >= n || j >= n) {
+                return;
+            }
+
+            // initialize accumulators and result
+            float sum_x, sum_y, sum_x2, sum_y2, sum_xy, coeff;
+            sum_x = sum_y = sum_x2 = sum_y2 = sum_xy = coeff = 0.0f;
+
+            // compute the sums
+            for (int k = 0; k < disp_len; k++) {
+                int x = input[i * disp_len + k];
+                int y = input[j * disp_len + k];
+
+                sum_x += x;
+                sum_y += y;
+                sum_x2 += x * x;
+                sum_y2 += y * y;
+                sum_xy += x * y;
+            }
+
+            // compute the pearson coefficient using the "sometimes numerically
+            // unstable" method because it's waaaay more computationally efficient
+            coeff = (disp_len * sum_xy - sum_x * sum_y) /
+                    sqrtf((disp_len * sum_x2 - sum_x * sum_x) * (disp_len * sum_y2 - sum_y * sum_y));
+
+            // dump it in the appropriate bucket
+            int bucket = (int)(coeff * num_buckets);
+            if (bucket >= num_buckets) {
+                atomicAdd(&(buckets[num_buckets - 1]), 1);
+            } else if (bucket >= 1) {
+                atomicAdd(&(buckets[bucket - 1]), 1);
+            }
+        }
+    ''')
+    
+    # TODO: the watchdog driver is killing the long running kernel, so break
+    # this up into 1000x1000 chunks and tile it over the matrix, then every
+    # time we get results back from the GPU merge them with our final buckets
+
+    matrix_dim = len(pyroprints)
+    dispensation_len = len(pyroprints[0])
+
+    cuda_input = numpy.zeros(shape=(matrix_dim, dispensation_len),
+                             dtype=numpy.int32, order='C')
+    for i in range(matrix_dim):
+        numpy.put(cuda_input[i], range(dispensation_len), pyroprints[i])
+
+    cuda_buckets = numpy.zeros(shape=(10000, 1), dtype=numpy.int32, order='C')
+    cuda_buckets_gpu = pycuda.gpuarray.to_gpu(cuda_buckets)
+
+    print('Firing off the GPU kernel')
+    pearson_cuda = kernel.get_function('pearson')
+    pearson_cuda(cuda_buckets_gpu.gpudata, numpy.int32(10000),
+                 cuda.In(cuda_input), numpy.int32(matrix_dim), numpy.int32(dispensation_len),
+                 block=(16, 16, 1), grid=(int(matrix_dim / 16), int(matrix_dim / 16)))
+    cuda_buckets_gpu.get(cuda_buckets)
+
+    print('Pearson correlation kernel finished')
+    exit()
+
+    print('cuda_buckets (abridged):')
+    for i in range(10000):
+        if cuda_buckets[i] > 0:
+            print('[%d] = %d' % (i, cuda_buckets[i]))
+
+    exit()
 
 
 # This is the standard boilerplate that calls the main() function.
