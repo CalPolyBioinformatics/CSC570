@@ -16,8 +16,11 @@
   compare pyroprints
   Graph pyroprints
   TODO:
-  generate pyroprints (CUDA)
-
+  generate pyroprints (CUDA) -- Bob: I'm not sure it makes a whole lot of sense
+    to spend time writing a kernel for this. Since we're only talking about
+    pyroprinting ~ 20k-50k strains it only takes like, a minute tops.
+  calculate pearson correl (CUDA) -- Bob: This makes a lot of sense. The matrix
+    is 50k x 50k and takes lightyears in Python right now.
   """
 
 import sys
