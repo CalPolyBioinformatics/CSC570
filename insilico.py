@@ -30,7 +30,6 @@ global pyro_dis_seq
 pyro_dis_seq = []
 number_samples = 20
 global num_opts
-num_opts = 7
 opteron_size = 103
 
 def main():
@@ -53,6 +52,7 @@ def main():
 
 def parseData(filename):
     global num_opts
+    num_opts = 0
     # Open file, assign to a list
     fd = open(filename, "r")
     fileInput = fd.readlines()
@@ -76,6 +76,8 @@ def parseData(filename):
 
 def getPeakHeightCompensations():
    nsamps = number_samples * 20
+   # peak height dictionary for calculating standard dev and averages
+   # 
    phc_dict = {"A" : [], "T" : [], "C" : [], "G" : []}
    samplePyroIds = []
 
@@ -110,6 +112,9 @@ def getPeakHeightCompensations():
          if h < 1:
             continue
          elif j < primer_len:
+            print "h " + str(h) + " num_opts " + str(num_opts)
+            print "math ceil h int " + str(int(math.ceil(h)))
+            print "math ceil h / num_opts " + str(int(math.ceil(h)) / num_opts)
             phc_dict[n].append(h/(num_opts * (int(math.ceil(h)) / num_opts)))
             j += 1
          else:
