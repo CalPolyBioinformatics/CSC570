@@ -15,25 +15,31 @@ HEIGHT = 0 # constant for the index of the average height of the pyroprint
 DISP = 0 # constant for the index of the dispensation seq in the pyroprint struct
 HVAL = 1 # constant for the index of the heights generated from the pyroprint
 
+# Database specific configs
 global con
 ghost = 'abra.csc.calpoly.edu'
 gport = 3306
 guser = 'csc570'
 gpasswd = 'ilovedata570'
 gdb_name = 'cplop'
+# For pulling samples from the database to build the table
 primer_len = 14
 short_disp = 'CCTCTACTAGAGCG20(TCGA)TT'
 pyro_ds_name = "ModTCGA-2c"
-global pyro_dis_seq = []
+global pyro_dis_seq
+pyro_dis_seq = []
 number_samples = 20
-global num_opts = 7
+global num_opts
+num_opts = 7
 opteron_size = 103
 
 def main():
    global con
+   
+   opts = parseData(sys.argv[1])
+   
    con = pymysql.connect(host = ghost, port = gport, user = guser, passwd = gpasswd, db = gdb_name)
 
-   opts = parseData(sys.argv[1])
    getPyroDispensationSeq()
    sdata = getSampleData()
 
@@ -150,7 +156,8 @@ def getSampleData():
    cur = con.cursor()
    sql = "SELECT DISTINCT H.pyroId FROM Histograms as H"
    sql += " JOIN Pyroprints as P ON (H.pyroId = P.pyroId) "
-   sql += "WHERE dsName = '" + short_disp + "'"
+   sql += "WHERE dsName = '" + short_disp + "' "
+   # sql += "ORDER BY RAND() LIMIT " + number_samples
 
    cur.execute(sql)
 
