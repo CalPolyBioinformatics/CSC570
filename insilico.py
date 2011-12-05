@@ -156,8 +156,6 @@ def getPeakHeightCompensations():
       # Change the value at index ph_nuc to just the avg
       phc_dict[ph_nuc] = avg
 
-   print phc_dict
-
    return (phc_dict, stdDev_Nucs)
 
 def getSampleData():
@@ -193,7 +191,7 @@ def getSampleData():
       sample = []
 
       for (r,) in cur:
-         sample.append(r)
+         sample.append(float(r))
 
       samples.append(sample)
 
@@ -252,7 +250,7 @@ def avgHeights(table, dispSeq, smpl, unitHeights, stdDev):
       calcUnitAvg = smpl[idx]/numNucleotides
       if (abs(calcUnitAvg - unitHeights[letter]) > stdDev[letter]):
          numNucleotides = numNucleotides - 1
-      currAvg = (totalVal + smpl[idx]/numNuc) / (totalSeen + numNucleotides) # add a height and average
+      currAvg = (totalVal + smpl[idx]/numNucleotides) / (totalSeen + numNucleotides) # add a height and average
       # Update values in list
       table[dispSeq][idx][letter][HEIGHT] = currAvg
       table[dispSeq][idx][letter][SEEN] = totalSeen + numNucleotides
