@@ -153,19 +153,10 @@ def getPeakHeightCompensations():
       stdDev_Nucs[ph_nuc] = math.sqrt(avg)
 
       # No longer need the list for the dictionary this nucleotide
-      phc_dict[ph_nuc] = []
-      # Add in the average found (should be the only element in the list)
-      phc_dict[ph_nuc].append(avg)
+      # Change the value at index ph_nuc to just the avg
+      phc_dict[ph_nuc] = avg
 
-   # Temp store all averages
-   phcA = phc_dict['A']
-   phcT = phc_dict['T']
-   phcC = phc_dict['C']
-   phcG = phc_dict['G']
-
-   # Convert phc_dict to a dictionary of Nucleotides to their average comp peak heights
-   # phc_dict was a dictionary of lists, now a dictionary of single values
-   phc_dict = {'A': phcA, 'T': phcT, 'G': phcG, 'C': phcC}
+   print phc_dict
 
    return (phc_dict, stdDev_Nucs)
 
