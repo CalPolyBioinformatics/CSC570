@@ -30,7 +30,7 @@ global pyro_dis_seq
 pyro_dis_seq = []
 number_samples = 20
 global num_opts
-opteron_size = 103
+opteron_size = 104
 
 def main():
    global con
@@ -103,27 +103,33 @@ def getPeakHeightCompensations():
 
       samplePyroIds.append(pid)
 
+      # get the first primer_len number of nucleotides peak heights pairs with pyroId
       sql = "SELECT nucleotide, pHeight FROM Histograms WHERE pyroId = " + str(pid)
+      sql += " LIMIT " + str(primer_len)
 
       cur.execute(sql)
 
-      j = 0
+      # FOR each nucleotide-peak height pair
       for (n,h) in cur:
+         # IF the height was less than one, junk data and discard
          if h < 1:
             continue
-         elif j < primer_len:
-            print "h " + str(h) + " num_opts " + str(num_opts)
-            print "math ceil h int " + str(int(math.ceil(h)))
-            print "math ceil h / num_opts " + str(int(math.ceil(h)) / num_opts)
-            phc_dict[n].append(h/(num_opts * (int(math.ceil(h)) / num_opts)))
-            j += 1
          else:
-            break
+            try:
+               phc_dict[n].append(h / (num_opts * (int(math.ceil(h)) / num_opts)))
+            except ZeroDivisionError:
+               # if the peak height is smaller than the number of opterons
+               # it could be the case that the unit value for this nucleotide
+               #  is less than 1, in this case we do a straight division
+               phc_dict[n].append(h / num_opts)
 
    cur.close()
 
+   # the average unit value for each nucleotide
    avgNucs = {'A' : 0, 'T' : 0, 'C' : 0, 'G' : 0}
+   # the standard deviation for the unit value for each nucleotide
    stdDev_Nucs = {'A' : 0, 'T' : 0, 'C' : 0, 'G' : 0}
+
    # Get the Average Compensated Peak Height Value for each Nucleotide
    for key in phc_dict:
       for h in phc_dict[key]:
@@ -133,13 +139,16 @@ def getPeakHeightCompensations():
    # Get the Standard Deviation for Each Complensated Peak Height for Each Nucleotide
    for ph_nuc in phc_dict:
       sum = 0
+
+      # get the average for the current nucleotide
       for h in phc_dict[key]:
          sum += math.pow((h - avgNucs[ph_nuc]), 2)
       avg = sum / nsamps
 
+      # calculate and store the standard dev for this nucleotide
       stdDev_Nucs[ph_nuc] = math.sqrt(avg)
 
-      # No longer need the list for the dictionary entry ph_nuc
+      # No longer need the list for the dictionary this nucleotide
       phc_dict[ph_nuc] = []
       # Add in the average found (should be the only element in the list)
       phc_dict[ph_nuc].append(avg)
@@ -151,6 +160,7 @@ def getPeakHeightCompensations():
    phcG = phc_dict['G']
 
    # Convert phc_dict to a dictionary of Nucleotides to their average comp peak heights
+   # phc_dict was a dictionary of lists, now a dictionary of single values
    phc_dict = {'A': phcA, 'T': phcT, 'G': phcG, 'C': phcC}
 
    return (phc_dict, stdDev_Nucs)
@@ -302,7 +312,7 @@ def graph(opterons, tbl, pyro_dis_seq):
         ph = tbl[pyro_dis_seq][i][dispSeqNuc][HEIGHT] * nucleotidesCounted
 
         # Add a tuple to the output list in format: (position, dispensation nucleotide, peak height value)
-        outputList.append( str(i) + ", " +  dispSeqNuc + ", "  + str(ph) )
+        outputList.append( str(i) + ", " +  dispSeqNuc + ", "  + str(ph) + "\n")
 
     # Dump contents into an output file
     cPickle.dump(outputList, fd)
