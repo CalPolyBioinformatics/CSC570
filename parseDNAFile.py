@@ -130,7 +130,7 @@ def main():
     numCombos += 1
     sys.stdout.write("\rGenerating Combo #{0}".format(numCombos))
 
-  print str(numCombos) + " Pryoprints Generated"
+  print "\n" + str(numCombos) + " Pryoprints Generated"
   
   allPCorrs = [] 
   smallestPCor = 1000 
