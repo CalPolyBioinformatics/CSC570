@@ -160,7 +160,8 @@ def main():
   print 'Calculating Pearson Correlation'
 
   if cuda_support:
-    cuda_pearson(allPyroPrints, 10000)
+    buckets = cuda_pearson(allPyroPrints, 10000)
+    cuda_plot(buckets)
   else:
     for i in range(0, len(allPyroPrints)-1):
       for j in range(i+1,len(allPyroPrints)-1):
@@ -193,42 +194,41 @@ def main():
             largestPCor = currPearsonR
         allPCorrs.append(currPearsonR)  '''
 
-#print allPCorrs
-  mu, sigma = 100, 15
-  #x = mu + sigma * np.random.randn(10000)
-  x = allPCorrs
-  fig = plt.figure()
-  ax = fig.add_subplot(111)
+        mu, sigma = 100, 15
+        #x = mu + sigma * np.random.randn(10000)
+        x = allPCorrs
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
 
-  # the histogram of the data
-  #n, bins, patches = ax.hist(x, 50, normed=1, facecolor='green', alpha=0.75)
-  n, bins, patches = ax.hist(x)
-  # hist uses np.histogram under the hood to create 'n' and 'bins'.
-  # np.histogram returns the bin edges, so there will be 50 probability
-  # density values in n, 51 bin edges in bins and 50 patches.  To get
-  # everything lined up, we'll compute the bin centers
-  bincenters = 0.5*(bins[1:]+bins[:-1])
-  # add a 'best fit' line for the normal PDF
-  y = mlab.normpdf( bincenters, mu, sigma)
-  l = ax.plot(bincenters, y, 'r--', linewidth=1)
+        # the histogram of the data
+        #n, bins, patches = ax.hist(x, 50, normed=1, facecolor='green', alpha=0.75)
+        n, bins, patches = ax.hist(x)
+        # hist uses np.histogram under the hood to create 'n' and 'bins'.
+        # np.histogram returns the bin edges, so there will be 50 probability
+        # density values in n, 51 bin edges in bins and 50 patches.  To get
+        # everything lined up, we'll compute the bin centers
+        bincenters = 0.5*(bins[1:]+bins[:-1])
+        # add a 'best fit' line for the normal PDF
+        y = mlab.normpdf( bincenters, mu, sigma)
+        l = ax.plot(bincenters, y, 'r--', linewidth=1)
 
-  ax.set_xlabel('Correlation Range')
-  ax.set_ylabel('Number of Correlation')
-  ax.set_title('Pearson Correlation of Data')
-  rangePearsonCor = largestPCor - smallestPCor
-  largestN = 0 ;
-  for i in range(0, len(n)):
-    print n[i]
-    if n[i] > largestN:
-      largestN = n[i] 
-  ax.set_xlim(smallestPCor - (.1*rangePearsonCor), largestPCor + (.1*rangePearsonCor))
-  ax.set_ylim(0, largestN*1.1)
-  ax.grid(True)
+        ax.set_xlabel('Correlation Range')
+        ax.set_ylabel('Number of Correlation')
+        ax.set_title('Pearson Correlation of Data')
+        rangePearsonCor = largestPCor - smallestPCor
+        largestN = 0 ;
+        for i in range(0, len(n)):
+          print n[i]
+          if n[i] > largestN:
+            largestN = n[i] 
+        ax.set_xlim(smallestPCor - (.1*rangePearsonCor), largestPCor + (.1*rangePearsonCor))
+        ax.set_ylim(0, largestN*1.1)
+        ax.grid(True)
 
-  #plt.show()
-  fname = 'pyroprintHisto.png'
-  print 'Saving frame', fname
-  fig.savefig(fname)
+        #plt.show()
+        fname = 'pyroprintHisto.png'
+        print 'Saving frame', fname
+        fig.savefig(fname)
 
 def buildDispSeq(seqExp):
         seq = re.findall('[a-zA-Z]+|\d+\([a-zA-Z]+\)',seqExp)
@@ -457,9 +457,52 @@ def cuda_pearson(pyroprints, num_buckets):
     buckets_gpu.get(buckets)
     print('100% complete')
 
-    exit()
     return buckets
-   
+
+
+def cuda_plot(buckets):
+    # merge into 6 bins as follows:
+    #   0: 0.997 -> 1.000
+    #   1: 0.990 -> 0.997
+    #   2: 0.970 -> 0.990
+    #   3: 0.900 -> 0.970
+    #   4: 0.700 -> 0.900
+    #   5: 0.000 -> 0.700
+
+    bins = [0, 0, 0, 0, 0, 0]
+
+    num_buckets = len(buckets)
+    for i in range(num_buckets):
+        current = i / float(num_buckets)
+        if current > 0.997:
+            bins[0] += buckets.item(i)
+        elif current > 0.990:
+            bins[1] += buckets.item(i)
+        elif current > 0.970:
+            bins[2] += buckets.item(i)
+        elif current > 0.900:
+            bins[3] += buckets.item(i)
+        elif current > 0.700:
+            bins[4] += buckets.item(i)
+        else:
+            bins[5] += buckets.item(i)
+    
+    bins.append(0) # visual spacer
+    bins.reverse()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.bar(range(len(bins)), bins, align='center')
+    ax.set_title('Pearson Correlation of Data')
+    ax.set_ylabel('Number of Pyroprints')
+    ax.set_xticks(range(len(bins)))
+    ax.set_xticklabels(['', '0% - 70%', '70% - 90%', '90% - 97%', '97% - 99%',
+                        '99% - 99.7%', '99.7% - 100%'])
+    ax.grid(True)
+    fig.autofmt_xdate()
+    print('Saving pyroprintHisto.png')
+    fig.savefig('pyroprintHisto.png')
+
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
