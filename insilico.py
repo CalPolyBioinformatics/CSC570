@@ -46,6 +46,8 @@ def main():
    getPyroDispensationSeq()
    sdata = getSampleData()
 
+   # Get the Unit Heights for each nucleotide (phcomps) and the standard dev for 
+   #     each nucleotide's unit value
    (phcomps, stdDevs) = getPeakHeightCompensations()
    con.close()
 
@@ -78,13 +80,20 @@ def parseData(filename):
 
     return optList
 
+# Gets the list of unit value compensated peak height values for each
+#     of the nucleotides and the standard deviation of unit values for
+#     each nucleotide
+# RETURNS: a tuple of the average unit peak height values and the
+#     standard deviations
 def getPeakHeightCompensations():
-   nsamps = number_samples * 20
+   nsamps = number_samples * 20  # Increase the number of samples to ensure
+                                 # and adequate sample
    # peak height dictionary for calculating standard dev and averages
-   # 
+   # phc_dict is a LIST of unit compensaited peak height values
    phc_dict = {"A" : [], "T" : [], "C" : [], "G" : []}
-   samplePyroIds = []
+   samplePyroIds = []      # A list of pyroprint samples used
 
+   # GET a list of all unique pyroIds from the Histograms
    sql = "SELECT DISTINCT H.pyroId FROM Histograms as H"
    sql += " JOIN Pyroprints as P ON (H.pyroId = P.pyroId) "
    sql += "WHERE dsName = '" + short_disp + "'"
@@ -93,18 +102,25 @@ def getPeakHeightCompensations():
 
    cur.execute(sql)
 
+   # FOR each returned result
    pyroids = []
    for (r,) in cur:
+      # APPEND the pyroId to the list of possible pyroids
       pyroids.append(int(r))
 
    plen = len(pyroids) - 1
 
+   # FOR the number of samples to get
    for i in range(nsamps):
+      # SELECT a random pyroId from the list
       pid = pyroids[random.randint(0, plen)]
 
+      # WHILE the candidate pyroId is in the samples list
       while pid in samplePyroIds:
+         # SELECT a random pyroId from the list
          pid = pyroids[random.randint(0, plen)]
 
+      # APPEND the qualified pyroId to the list of sample pyroids
       samplePyroIds.append(pid)
 
       # get the first primer_len number of nucleotides peak heights pairs with pyroId
@@ -120,12 +136,14 @@ def getPeakHeightCompensations():
             continue
          else:
             try:
-               phc_dict[n].append(h / (num_opts * (int(math.ceil(h)) / num_opts)))
+               # Compute the unit value for this peak height given the number of opterons
+               # NOTE: you must convert the peak height 'h' to a float!
+               phc_dict[n].append(float(h) / (num_opts * (int(math.ceil(h)) / num_opts)))
             except ZeroDivisionError:
                # if the peak height is smaller than the number of opterons
                # it could be the case that the unit value for this nucleotide
                #  is less than 1, in this case we do a straight division
-               phc_dict[n].append(h / num_opts)
+               phc_dict[n].append(float(h) / num_opts)
 
    cur.close()
 
@@ -152,17 +170,16 @@ def getPeakHeightCompensations():
       # calculate and store the standard dev for this nucleotide
       stdDev_Nucs[ph_nuc] = math.sqrt(avg)
 
-      # No longer need the list for the dictionary this nucleotide
-      # Change the value at index ph_nuc to just the avg
-      phc_dict[ph_nuc] = avg
+   # Return the average for each nucleotide and the standard deviations
+   return (avgNucs, stdDev_Nucs)
 
-   print phc_dict
-
-   return (phc_dict, stdDev_Nucs)
-
+# Connects to the database and retreives the samples to be used when
+#     building the table
+# RETURNS: a list of samples where a single sample is a list of peak heights 
+#     for a single pyro run
 def getSampleData():
-   samples = []
-   samplePyroIds = []
+   samples = []         # A list of pyroprint samples from the DB
+   samplePyroIds = []   # A list of pyroprints added to the samples
    cur = con.cursor()
    sql = "SELECT DISTINCT H.pyroId FROM Histograms as H"
    sql += " JOIN Pyroprints as P ON (H.pyroId = P.pyroId) "
@@ -171,6 +188,7 @@ def getSampleData():
 
    cur.execute(sql)
 
+   # GET a list of distinct pyroIds to randomly select from
    rws = cur.fetchall()
    pyroids = []
    for (r,) in rws:
@@ -178,29 +196,46 @@ def getSampleData():
 
    plen = len(pyroids) - 1
 
+   # FOR the number of samples to be retrieved
    for i in range(number_samples):
+      # GET a random pyroId
       pid = pyroids[random.randint(0, plen)]
 
+      # WHILE this pyroId has already been selected
       while pid in samplePyroIds:
+         # GET another random pyroId
          pid = pyroids[random.randint(0, plen)]
 
+      # APPEND a valid pyroId (one not already selected) to the list of samples
       samplePyroIds.append(pid)
 
+      # GET the peak heights from the Histograms with pyroId pid
       sql = "SELECT pHeight FROM Histograms WHERE pyroId = " + str(pid)
 
       cur.execute(sql)
 
+      # Create a new empty sample list
       sample = []
 
+      # FOR each peak height returned 
       for (r,) in cur:
-         sample.append(r)
+         # APPEND the peak height to the sample list
+         # NOTE: you must convert the returned value to a float since
+         #     PyMySQL returns a Decimal type
+         sample.append(float(r))
 
+      # APPEND the sample to the list of samples
       samples.append(sample)
 
    cur.close()
 
    return samples
 
+# Connects to the database and gets the dispSeq from the Dispensation Table
+#     where the dsName matches pyro_ds_name
+# SETS: the global pyro_dis_seq to the database result
+# Required because there are no relations in the DB to do this conversion
+#     automatically
 def getPyroDispensationSeq():
    global pyro_dis_seq
    sql = "SELECT dispSeq FROM Dispensation WHERE dsName = '" + pyro_ds_name + "'"
@@ -208,8 +243,11 @@ def getPyroDispensationSeq():
    cur = con.cursor()
    cur.execute(sql)
 
+   # The extra comma (,) is required here WITHOUT the parens because pyMySQL
+   #     returns a tuple no matter the number of columns selected
    tmp, = cur.fetchone()
 
+   # FOR each character returned, build the pyro_dis_seq list
    for c in tmp:
       pyro_dis_seq.append(c)
 
@@ -248,14 +286,27 @@ def avgHeights(table, dispSeq, smpl, unitHeights, stdDev):
          table[dSeq] = createTableEntry()
 
       totalVal = currAvg * totalSeen # undo averaging
+      print "smpl[" + str(idx) + "] " + str(smpl[idx])
+      print "unitHeights[" + str(letter) + "] " + str(unitHeights[letter])
+      print "smpl/uh " + str(smpl[idx]/unitHeights[letter])
+      print "round() " + str(round(smpl[idx]/unitHeights[letter]))
+
       numNucleotides = round(smpl[idx]/unitHeights[letter])
       calcUnitAvg = smpl[idx]/numNucleotides
+      
+      print "numNucs " + str(numNucleotides)
+
       if (abs(calcUnitAvg - unitHeights[letter]) > stdDev[letter]):
          numNucleotides = numNucleotides - 1
-      currAvg = (totalVal + smpl[idx]/numNuc) / (totalSeen + numNucleotides) # add a height and average
+      
+      print "totalVal " + str(totalVal)
+      print "totalSeen " + str(totalSeen)
+      print "numNucs " + str(numNucleotides)
+      currAvg = (totalVal + smpl[idx]/numNucleotides) / (totalSeen + numNucleotides) # add a height and average
+      
       # Update values in list
-      table[dispSeq][idx][letter][HEIGHT] = currAvg
-      table[dispSeq][idx][letter][SEEN] = totalSeen + numNucleotides
+      table[dSeq][idx][letter][HEIGHT] = currAvg
+      table[dSeq][idx][letter][SEEN] = totalSeen + numNucleotides
 
 # Takes in a generated pyroprint and keeps a running average of the heights in
 # a given slot for a given dispensation sequence
