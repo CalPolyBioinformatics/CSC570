@@ -149,9 +149,6 @@ def main():
     numCombos += 1
     sys.stdout.write("\rGenerating Combo #{0}".format(numCombos))
 
-    if numCombos % 1000 == 0:
-        print('%dk sequences...' % (numCombos / 1000))
-
   print str(numCombos) + " Pyroprints Generated"
   
   allPCorrs = [] 
@@ -161,7 +158,7 @@ def main():
   print 'Calculating Pearson Correlation'
 
   if cuda_support:
-    cuda_pearson(allPyroPrints)
+    cuda_pearson(allPyroPrints, 10000)
   else:
     for i in range(0, len(allPyroPrints)-1):
       for j in range(i+1,len(allPyroPrints)-1):
@@ -315,37 +312,36 @@ def getIterLength(iterator):
   result = len(temp)
   iterator = iter(temp)
   return result
-'''
-def expandDispSeq(dispSeq):
-  #cctctactagagcg20(tcga)tt
-  #aacacgcga23(gatc)gaa
-  #number_regex = re.compile('[0-9]*')
-  multiplier = ''
-  multStart = 0 
-  multEnd = 0
-  multSeq = ''
-  result = ''
-  p = re.compile('[0-9]+')
-  print p.findall(dispSeq)
-  print 'result'
-  print result
-  return result
 
-
-  for i in range(0, len(dispSeq)):
-    if dispSeq[i:i+1].isdigit():
-      multiplierStart = i 
-
-    
-  for char in dispSeq:
-    if char.isalpha():
-      result.append(char)
-    if char.isdigit():
-      multiplier.appent(char)
-    if char.expandDispSeq
-      print "Seq"
-  #TODO finish this code
-     ''' 
+#def expandDispSeq(dispSeq):
+#  #cctctactagagcg20(tcga)tt
+#  #aacacgcga23(gatc)gaa
+#  #number_regex = re.compile('[0-9]*')
+#  multiplier = ''
+#  multStart = 0 
+#  multEnd = 0
+#  multSeq = ''
+#  result = ''
+#  p = re.compile('[0-9]+')
+#  print p.findall(dispSeq)
+#  print 'result'
+#  print result
+#  return result
+#
+#
+#  for i in range(0, len(dispSeq)):
+#    if dispSeq[i:i+1].isdigit():
+#      multiplierStart = i 
+#
+#    
+#  for char in dispSeq:
+#    if char.isalpha():
+#      result.append(char)
+#    if char.isdigit():
+#      multiplier.appent(char)
+#    if char.expandDispSeq
+#      print "Seq"
+#  #TODO finish this code
   
 
 def combinations_with_replacement(iterable, r):
@@ -365,16 +361,23 @@ def combinations_with_replacement(iterable, r):
     indices[i:] = [indices[i] + 1] * (r - i)
     yield tuple(pool[i] for i in indices)
 
-def cuda_pearson(pyroprints):
-    print('Prepping data for CUDA')
+def cuda_pearson(pyroprints, num_buckets):
     kernel = pycuda.compiler.SourceModule('''
-        __global__ void pearson(int *buckets, int num_buckets, int *input, int n, int disp_len) {
-            // calculate absolute <i, j> coords within the matrix
+        __global__ void pearson(int *buckets, int num_buckets,
+                                int *A, int num_A, int *B, int num_B,
+                                int s, int t, int n, int m) {
+
+            // calculate relative <i, j> coords within this tile
             int i = blockIdx.y * blockDim.y + threadIdx.y; // row
             int j = blockIdx.x * blockDim.x + threadIdx.x; // column
 
+            // calculate the offsets based on the tile number
+            int i_offset = s * gridDim.y * blockDim.y;
+            int j_offset = t * gridDim.x * blockDim.x;
+
             // make sure this thread is inside the matrix
-            if (i >= n || j >= n) {
+            if (i + i_offset >= n ||
+                j + j_offset >= n) {
                 return;
             }
 
@@ -383,9 +386,9 @@ def cuda_pearson(pyroprints):
             sum_x = sum_y = sum_x2 = sum_y2 = sum_xy = coeff = 0.0f;
 
             // compute the sums
-            for (int k = 0; k < disp_len; k++) {
-                int x = input[i * disp_len + k];
-                int y = input[j * disp_len + k];
+            for (int k = 0; k < m; k++) {
+                int x = A[i * m + k];
+                int y = B[j * m + k];
 
                 sum_x += x;
                 sum_y += y;
@@ -395,9 +398,9 @@ def cuda_pearson(pyroprints):
             }
 
             // compute the pearson coefficient using the "sometimes numerically
-            // unstable" method because it's waaaay more computationally efficient
-            coeff = (disp_len * sum_xy - sum_x * sum_y) /
-                    sqrtf((disp_len * sum_x2 - sum_x * sum_x) * (disp_len * sum_y2 - sum_y * sum_y));
+            // unstable" method because it's way more computationally efficient
+            coeff = (m * sum_xy - sum_x * sum_y) /
+                    sqrtf((m * sum_x2 - sum_x * sum_x) * (m * sum_y2 - sum_y * sum_y));
 
             // dump it in the appropriate bucket
             int bucket = (int)(coeff * num_buckets);
@@ -408,38 +411,53 @@ def cuda_pearson(pyroprints):
             }
         }
     ''')
+    pearson_kernel = kernel.get_function('pearson')
+
+    n = len(pyroprints)
+    m = len(pyroprints[0])
     
-    # TODO: the watchdog driver is killing the long running kernel, so break
-    # this up into 1000x1000 chunks and tile it over the matrix, then every
-    # time we get results back from the GPU merge them with our final buckets
+    block_size = 16
+    tile_size = 2
+    num_tiles = (n / (tile_size * block_size)) + 1
 
-    matrix_dim = len(pyroprints)
-    dispensation_len = len(pyroprints[0])
+    buckets = numpy.zeros(shape=(num_buckets, 1), dtype=numpy.int32, order='C')
+    buckets_gpu = pycuda.gpuarray.to_gpu(buckets)
 
-    cuda_input = numpy.zeros(shape=(matrix_dim, dispensation_len),
-                             dtype=numpy.int32, order='C')
-    for i in range(matrix_dim):
-        numpy.put(cuda_input[i], range(dispensation_len), pyroprints[i])
+    for s in range(num_tiles):
+        for t in range(num_tiles):
+            num_A = tile_size * block_size
+            remain_A = n - (s * tile_size * block_size)
+            num_A = num_A if num_A < remain_A else remain_A
 
-    cuda_buckets = numpy.zeros(shape=(10000, 1), dtype=numpy.int32, order='C')
-    cuda_buckets_gpu = pycuda.gpuarray.to_gpu(cuda_buckets)
+            A = numpy.zeros(shape=(num_A, m), dtype=numpy.int32, order='C')
+            for i in range(num_A):
+                numpy.put(A[i], range(m), pyroprints[(s * tile_size * block_size) + i])
 
-    print('Firing off the GPU kernel')
-    pearson_cuda = kernel.get_function('pearson')
-    pearson_cuda(cuda_buckets_gpu.gpudata, numpy.int32(10000),
-                 cuda.In(cuda_input), numpy.int32(matrix_dim), numpy.int32(dispensation_len),
-                 block=(16, 16, 1), grid=(int(matrix_dim / 16), int(matrix_dim / 16)))
-    cuda_buckets_gpu.get(cuda_buckets)
+            num_B = tile_size * block_size
+            remain_B = n - (t * tile_size * block_size)
+            num_B = num_B if num_B < remain_B else remain_B
 
-    print('Pearson correlation kernel finished')
+            B = numpy.zeros(shape=(num_B, m), dtype=numpy.int32, order='C')
+            for i in range(num_B):
+                numpy.put(B[i], range(m), pyroprints[(t * tile_size * block_size) + i])
+
+            pearson_kernel(buckets_gpu.gpudata, numpy.int32(num_buckets),
+                           cuda.In(A), numpy.int32(num_A),
+                           cuda.In(B), numpy.int32(num_B),
+                           numpy.int32(s), numpy.int32(t),
+                           numpy.int32(n), numpy.int32(m),
+                           block=(block_size, block_size, 1),
+                           grid=(tile_size, tile_size))
+
+            progress = ((s * num_tiles + t) * 100) / (num_tiles * num_tiles)
+            sys.stdout.write('\r%d%% complete' % progress)
+
+    buckets_gpu.get(buckets)
+    print('\r100% complete')
+
     exit()
-
-    print('cuda_buckets (abridged):')
-    for i in range(10000):
-        if cuda_buckets[i] > 0:
-            print('[%d] = %d' % (i, cuda_buckets[i]))
-
-    exit()
+    return buckets
+   
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
