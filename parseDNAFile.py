@@ -147,9 +147,11 @@ def main():
 
     allPyroPrints.append(pyroprintData(oneCombo, dispSeq))
     numCombos += 1
-    sys.stdout.write("\rGenerating Combo #{0}".format(numCombos))
 
-  print str(numCombos) + " Pyroprints Generated"
+    if numCombos % 1000 == 0:
+        print('%d pyroprints' % numCombos)
+
+  print('%d total pyroprints' % numCombos)
   
   allPCorrs = [] 
   smallestPCor = 1000 
@@ -417,7 +419,7 @@ def cuda_pearson(pyroprints, num_buckets):
     m = len(pyroprints[0])
     
     block_size = 16
-    tile_size = 2
+    tile_size = 64
     num_tiles = (n / (tile_size * block_size)) + 1
 
     buckets = numpy.zeros(shape=(num_buckets, 1), dtype=numpy.int32, order='C')
@@ -450,10 +452,10 @@ def cuda_pearson(pyroprints, num_buckets):
                            grid=(tile_size, tile_size))
 
             progress = ((s * num_tiles + t) * 100) / (num_tiles * num_tiles)
-            sys.stdout.write('\r%d%% complete' % progress)
+            print('%d%% complete' % progress)
 
     buckets_gpu.get(buckets)
-    print('\r100% complete')
+    print('100% complete')
 
     exit()
     return buckets
