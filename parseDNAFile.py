@@ -67,7 +67,6 @@ def main():
   print "Fetching Files"
   
   for infile in listing:
-    #print "current file is: " + 'Genome Sequences/ecoli36cassettes/' + infile
     # Open File
     with open(dataPath + infile) as f:
         text = f.read()
@@ -79,10 +78,10 @@ def main():
                     allSequences.append(substring)
                     substring = line
                 else:
-                    substring += line.replace("\r\r\n","")
+		    substring += line.replace("\n","")
         else:
       	    for line in text:
-              substring += line.replace("\r\r\n","")
+	      substring += line.replace("\n","")
 
       	    allSequences.append(substring)
   
@@ -90,9 +89,7 @@ def main():
   primer = primerSequence
   
   print "Generating Sequences"
-
   for sequence in allSequences:
-    #print("sequence" + sequence)
     #find primer
     if primer in sequence:
       #Current sequence position
@@ -100,22 +97,17 @@ def main():
       #Current disposition
       dispCount = 0
       primerLoc = sequence.find(primer)
-      #print('Found Primer At:' + str(primerLoc))
-      #print("Found Primer in Sequence:" + sequence[primerLoc:primerLoc+20])
-      #print("Found Sequence after Primer:" + sequence[primerLoc+20:primerLoc+20+140])
       #get next 104 dispensations
-
       while dispCount < len(dispSeq):
-        #print sequence[primerLoc+20+seqCount], dispSeq1[dispCount], seqCount, dispCount
-        if sequence[primerLoc+20+seqCount] == dispSeq[dispCount]:
+        if sequence[primerLoc+len(primerSequence)+seqCount] == dispSeq[dispCount]:
           seqCount += 1
-        elif (sequence[primerLoc+20+seqCount] != 'A') & (sequence[primerLoc+20+seqCount] != 'T') & (sequence[primerLoc+20+seqCount] != 'C') &(sequence[primerLoc+20+seqCount] != 'G'):
+        elif (sequence[primerLoc+len(primerSequence)+seqCount] != 'A') & (sequence[primerLoc+len(primerSequence)+seqCount] != 'T') & (sequence[primerLoc+len(primerSequence)+seqCount] != 'C') &(sequence[primerLoc+len(primerSequence)+seqCount] != 'G'):
           seqCount += 1
           dispCount += 1
         else:
             dispCount += 1
-        seqList.append(sequence[primerLoc+20:primerLoc+20+seqCount])
-        #seqList.append(sequence[primerLoc+20:primerLoc+20+104])
+      seqList.append(sequence[primerLoc+len(primerSequence):primerLoc+len(primerSequence)+seqCount])
+
 
   #find unique strings
   uniqueSequences = []
@@ -125,7 +117,6 @@ def main():
   allCombinations = combinations_with_replacement(uniqueSequences,7)
   
   print "Pryoprinting Sequences"
-
   #find all combinations
   numCombos = 0
   allPyroPrints = []
@@ -137,7 +128,7 @@ def main():
 
     allPyroPrints.append(pyroprintData(oneCombo, dispSeq))
     numCombos += 1
-
+ 
   print str(numCombos) + " Pryoprints Generated"
   
   allPCorrs = [] 
@@ -254,7 +245,6 @@ def pyroprintData(oneCombo, dispSeq):
   #Go through the 7 sequences and run through the disposition sequence getting the heights
   while t < 7:
     while seqCount < length[t]:
-      #print sequence[t][seqCount], dispSeq1[dispCount]
       if sequence[t][seqCount] == dispSeq[dispCount]:
         pyroCount += 1
         seqCount += 1
@@ -263,8 +253,7 @@ def pyroprintData(oneCombo, dispSeq):
       elif (sequence[t][seqCount] != 'A') & (sequence[t][seqCount] != 'T') & (sequence[t][seqCount] != 'C') & (sequence[t][seqCount] != 'G'):
         seqCount += 1
         dispCount += 1
-        if seqCount == length[t]:
-          pyroData[t].append(pyroCount)
+        pyroData[t].append(pyroCount)
       else:
         pyroData[t].append(pyroCount)
         pyroCount = 0
@@ -277,8 +266,6 @@ def pyroprintData(oneCombo, dispSeq):
   seqCount = 0
   #Get the max length of the heights (since they can be different - finish quicker/slower)
   maxVal = max(len(pyroData[0]),len(pyroData[1]),len(pyroData[2]),len(pyroData[3]),len(pyroData[4]),len(pyroData[5]),len(pyroData[6]))
-  #print len(pyroData[0]),len(pyroData[1]),len(pyroData[2]),len(pyroData[3]),len(pyroData[4]),len(pyroData[5]),len(pyroData[6])
-  
   
   #Pad the heights that do not have 0's that need them for adding
   x=0
@@ -295,8 +282,6 @@ def pyroprintData(oneCombo, dispSeq):
     height.append( int(pyroData[0][seqCount]) + int(pyroData[1][seqCount]) + int(pyroData[2][seqCount]) + int(pyroData[3][seqCount]) + int(pyroData[4][seqCount]) + int(pyroData[5][seqCount]) + int(pyroData[6][seqCount]))
     seqCount += 1
   
-  
-  #print len(height)
   
   return height
 
@@ -354,8 +339,6 @@ def combinations_with_replacement(iterable, r):
       return
     indices[i:] = [indices[i] + 1] * (r - i)
     yield tuple(pool[i] for i in indices)
-
-
 
 
 # This is the standard boilerplate that calls the main() function.
