@@ -74,16 +74,16 @@ def main():
 
         if(text.find("ribosomal RNA")>0):
             for line in text:
-       	        if ">" in line:
+                if ">" in line:
                     allSequences.append(substring)
                     substring = line
                 else:
-		    substring += line.replace("\n","")
+                    substring += line.replace("\n","")
         else:
-      	    for line in text:
-	      substring += line.replace("\n","")
+            for line in text:
+              substring += line.replace("\n","")
 
-      	    allSequences.append(substring)
+            allSequences.append(substring)
   
   seqList = []
   primer = primerSequence
@@ -128,7 +128,8 @@ def main():
 
     allPyroPrints.append(pyroprintData(oneCombo, dispSeq))
     numCombos += 1
- 
+    sys.stdout.write("\rGenerating Combo #{0}".format(numCombos))
+
   print str(numCombos) + " Pryoprints Generated"
   
   allPCorrs = [] 
@@ -207,22 +208,22 @@ def main():
 
 def buildDispSeq(seqExp):
 
-	seq = re.findall('[a-zA-Z]+|\d+\([a-zA-Z]+\)',seqExp)
-	
-	complete = ''
-	for item in seq:
-		if re.match('\d',item):
-			loopinfo = re.split('\(|\)',item)
-			count = int(loopinfo[0])
-			chars = loopinfo[1]
-			i = 0
-			while i < count:
-				complete += chars
-				i += 1
-		else:
-			complete += item
+        seq = re.findall('[a-zA-Z]+|\d+\([a-zA-Z]+\)',seqExp)
+        
+        complete = ''
+        for item in seq:
+                if re.match('\d',item):
+                        loopinfo = re.split('\(|\)',item)
+                        count = int(loopinfo[0])
+                        chars = loopinfo[1]
+                        i = 0
+                        while i < count:
+                                complete += chars
+                                i += 1
+                else:
+                        complete += item
 
-	return complete
+        return complete
 
 def pyroprintData(oneCombo, dispSeq):
   sequence = oneCombo
