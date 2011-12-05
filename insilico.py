@@ -252,8 +252,8 @@ def avgHeights(table, dispSeq, smpl, unitHeights, stdDev):
          numNucleotides = numNucleotides - 1
       currAvg = (totalVal + smpl[idx]/numNucleotides) / (totalSeen + numNucleotides) # add a height and average
       # Update values in list
-      table[dispSeq][idx][letter][HEIGHT] = currAvg
-      table[dispSeq][idx][letter][SEEN] = totalSeen + numNucleotides
+      table[dSeq][idx][letter][HEIGHT] = currAvg
+      table[dSeq][idx][letter][SEEN] = totalSeen + numNucleotides
 
 # Takes in a generated pyroprint and keeps a running average of the heights in
 # a given slot for a given dispensation sequence
