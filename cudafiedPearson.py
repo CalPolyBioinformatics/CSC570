@@ -4,10 +4,11 @@ import pycuda.compiler
 import pycuda.gpuarray
 import numpy
 from scipy.stats.stats import pearsonr
+import time
 
 def main():
-    n = 6 # number of pyroprints
-    m = 10 # pyroprint length
+    n = 512 # number of pyroprints
+    m = 104 # pyroprint length
 
     pyroprints = numpy.zeros(shape=(n, m), dtype=numpy.int32, order='C')
     for i in range(n):
@@ -19,19 +20,37 @@ def main():
     print('\n');
 
     print('=== computing with python ===')
+    python_start = time.time()
     python_buckets = compute_python(pyroprints, 10000)
-    print('buckets (abridged):')
-    for i in range(10000):
-        if python_buckets[i] > 0:
-            print('\t[%d] = %d' % (i, python_buckets[i]))
+    python_end = time.time()
+
+    #print('buckets (abridged):')
+    #for i in range(10000):
+    #    if python_buckets[i] > 0:
+    #        print('\t[%d] = %d' % (i, python_buckets[i]))
+    #print('\n')
+
+    python_time = python_end - python_start
+    print('computed in %f seconds' % python_time)
     print('\n')
 
     print('=== computing with cuda ===')
+    cuda_start = time.time()
     cuda_buckets = compute_cuda(pyroprints, 10000)
-    print('buckets (abridged):')
-    for i in range(10000):
-        if cuda_buckets[i] > 0:
-            print('\t[%d] = %d' % (i, cuda_buckets[i]))
+    cuda_end = time.time()
+
+    #print('buckets (abridged):')
+    #for i in range(10000):
+    #    if cuda_buckets[i] > 0:
+    #        print('\t[%d] = %d' % (i, cuda_buckets[i]))
+    #print('\n')
+
+    cuda_time = cuda_end - cuda_start
+    print('computed in %f seconds' % cuda_time)
+    print('\n')
+
+    speedup = python_time / cuda_time
+    print('speedup of %fx' % speedup)
     print('\n')
 
     print('done')
@@ -111,8 +130,8 @@ def compute_cuda(pyroprints, num_buckets):
     n = len(pyroprints)
     m = len(pyroprints[0])
     
-    block_size = 2
-    tile_size = 2
+    block_size = 16
+    tile_size = 64
     num_tiles = (n / (tile_size * block_size)) + 1
 
     buckets = numpy.zeros(shape=(num_buckets, 1), dtype=numpy.int32, order='C')
