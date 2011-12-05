@@ -57,6 +57,57 @@ def compute_python(pyroprints, num_buckets):
 
 
 def compute_cuda(pyroprints, num_buckets):
+    kernel = pycuda.compiler.SourceModule('''
+        __global__ void pearson(int *buckets, int num_buckets,
+                                int *A, int num_A, int *B, int num_B,
+                                int s, int t, int n, int m) {
+
+            // calculate relative <i, j> coords within this tile
+            int i = blockIdx.y * blockDim.y + threadIdx.y; // row
+            int j = blockIdx.x * blockDim.x + threadIdx.x; // column
+
+            // calculate the offsets based on the tile number
+            int i_offset = s * gridDim.y * blockDim.y;
+            int j_offset = t * gridDim.x * blockDim.x;
+
+            // make sure this thread is inside the matrix
+            if (i + i_offset >= n ||
+                j + j_offset >= n) {
+                return;
+            }
+
+            // initialize accumulators and result
+            float sum_x, sum_y, sum_x2, sum_y2, sum_xy, coeff;
+            sum_x = sum_y = sum_x2 = sum_y2 = sum_xy = coeff = 0.0f;
+
+            // compute the sums
+            for (int k = 0; k < m; k++) {
+                int x = A[i * m + k];
+                int y = B[j * m + k];
+
+                sum_x += x;
+                sum_y += y;
+                sum_x2 += x * x;
+                sum_y2 += y * y;
+                sum_xy += x * y;
+            }
+
+            // compute the pearson coefficient using the "sometimes numerically
+            // unstable" because it's waaaay more computationally efficient
+            coeff = (m * sum_xy - sum_x * sum_y) /
+                    sqrtf((m * sum_x2 - sum_x * sum_x) * (m * sum_y2 - sum_y * sum_y));
+
+            // dump it in the appropriate bucket
+            int bucket = (int)(coeff * num_buckets);
+            if (bucket >= num_buckets) {
+                atomicAdd(&(buckets[num_buckets - 1]), 1);
+            } else if (bucket >= 1) {
+                atomicAdd(&(buckets[bucket - 1]), 1);
+            }
+        }
+    ''')
+    pearson_kernel = kernel.get_function('pearson')
+
     n = len(pyroprints)
     m = len(pyroprints[0])
     
@@ -85,85 +136,16 @@ def compute_cuda(pyroprints, num_buckets):
             for i in range(num_B):
                 numpy.put(B[i], range(m), pyroprints[(t * tile_size * block_size) + i])
 
-            print(A)
-            print(B)
-            print('\n')
+            pearson_kernel(buckets_gpu.gpudata, numpy.int32(num_buckets),
+                           cuda.In(A), numpy.int32(num_A),
+                           cuda.In(B), numpy.int32(num_B),
+                           numpy.int32(s), numpy.int32(t),
+                           numpy.int32(n), numpy.int32(m),
+                           block=(block_size, block_size, 1),
+                           grid=(tile_size, tile_size))
 
     buckets_gpu.get(buckets)
     return buckets
-
-
-
-
-
-
-#kernel = SourceModule('''
-#    __global__ void pearson(int *buckets, int num_buckets, int *input, int n, int disp_len) {
-#        // calculate absolute <i, j> coords within the matrix
-#        int i = blockIdx.y * blockDim.y + threadIdx.y; // row
-#        int j = blockIdx.x * blockDim.x + threadIdx.x; // column
-#
-#        // make sure this thread is inside the matrix
-#        if (i >= n || j >= n) {
-#            return;
-#        }
-#
-#        // initialize accumulators and result
-#        float sum_x, sum_y, sum_x2, sum_y2, sum_xy, coeff;
-#        sum_x = sum_y = sum_x2 = sum_y2 = sum_xy = coeff = 0.0f;
-#
-#        // compute the sums
-#        for (int k = 0; k < disp_len; k++) {
-#            int x = input[i * disp_len + k];
-#            int y = input[j * disp_len + k];
-#
-#            sum_x += x;
-#            sum_y += y;
-#            sum_x2 += x * x;
-#            sum_y2 += y * y;
-#            sum_xy += x * y;
-#        }
-#
-#        // compute the pearson coefficient using the "sometimes numerically
-#        // unstable" because it's waaaay more computationally efficient
-#        coeff = (disp_len * sum_xy - sum_x * sum_y) /
-#                sqrtf((disp_len * sum_x2 - sum_x * sum_x) * (disp_len * sum_y2 - sum_y * sum_y));
-#
-#        // dump it in the appropriate bucket
-#        int bucket = (int)(coeff * num_buckets);
-#        if (bucket >= num_buckets) {
-#            atomicAdd(&(buckets[num_buckets - 1]), 1);
-#        } else if (bucket >= 1) {
-#            atomicAdd(&(buckets[bucket - 1]), 1);
-#        }
-#    }
-#''')
-#
-## TODO: the watchdog driver is killing the long running kernel, so break
-## this up into 1000x1000 chunks and tile it over the matrix, then every
-## time we get results back from the GPU merge them with our final buckets
-#
-#pearson_cuda_input = numpy.zeros(shape=(n, m), dtype=numpy.int32, order='C')
-#for i in range(n):
-#    numpy.put(pearson_cuda_input[i], range(m), pearson_input[i])
-#
-#print('pearson_cuda_input:')
-#print(pearson_cuda_input)
-#print('\n')
-#
-#pearson_cuda_buckets = numpy.zeros(shape=(10000, 1), dtype=numpy.int32, order='C')
-#buckets_gpu = pycuda.gpuarray.to_gpu(pearson_cuda_buckets)
-#
-#pearson_cuda = kernel.get_function("pearson")
-#pearson_cuda(buckets_gpu.gpudata, numpy.int32(10000),
-#             cuda.In(pearson_cuda_input), numpy.int32(n), numpy.int32(m),
-#             block=(4, 4, 1), grid=(2, 2))
-#buckets_gpu.get(pearson_cuda_buckets)
-#
-#print('pearson_cuda_buckets (abridged):')
-#for i in range(10000):
-#    if pearson_cuda_buckets[i] > 0:
-#        print('[%d] = %d' % (i, pearson_cuda_buckets[i]))
 
 if __name__ == '__main__':
     main()
