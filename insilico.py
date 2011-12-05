@@ -32,6 +32,10 @@ number_samples = 20
 global num_opts
 opteron_size = 104
 
+# Dispensation Sequence Derived from File:
+# '12-15-10b rep plasmid ratios-ModGATC-2controls.xls'
+graph_disp_seq = "AACACGCGAGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGAA"
+
 def main():
    global con
    
@@ -283,7 +287,7 @@ def averageHeights(dispSeq, sampleList, unitHeights, stdDev):
    return table
 
 def graph(opterons, tbl, pyro_dis_seq):
-    dispSeq = [T, C, G, A]
+    dispSeq = list(graph_disp_seq)
     outputList = []
     fd = open("pyroprint.out", "w")
 
