@@ -34,7 +34,7 @@ import matplotlib.mlab as mlab
 import math
 import re 
 from optparse import OptionParser
-
+import ConfigParser
 # detect pycuda support
 cuda_support = False
 try:
@@ -42,12 +42,9 @@ try:
     import pycuda.driver as cuda
     import pycuda.compiler
     import pycuda.gpuarray
-    print('PyCUDA detected.')
     cuda_support = True
 except:
-    print('PyCUDA not detected. Calculating the Pearson correlation matrix for lots')
-    print('of strains might take... oh... a century or two. A real-life renactment')
-    print('of "99 Bottles of Beer on the Wall" is recommended to pass the time.')
+   pass
 
 ####CHANGE THESE VALUES TO CHANGE HOW THE PROGRAM RUNS
 ###DIRECTORY WITH DATA FILES:
@@ -55,8 +52,8 @@ except:
 #16-23 primer GGAACCTGCGGTTGGATCAC
 #23-5 primer CGTGAGGCTTAACCTT
 #primerSequence = "GGAACCTGCGGTTGGATCAC"
-#primerSequence = "TTGGATCAC"
-primerSequence = "AACCTT"
+primerSequence = "TTGGATCAC"
+#primerSequence = "AACCTT"
 
 ##Dispensation Sequence:
 #23-5 AACACGCGA23(GATC)GAA
@@ -70,12 +67,35 @@ def main():
   parser.add_option("-p", "--path", dest="dir", default="Genome Sequences/rDNA plasmid sequences/23-5/", help="Path to Genome Sequence Folders")
   parser.add_option("-d", dest="DispSeq", default="AACACGCGA23(GATC)GAA", help="Dispination order")
   parser.add_option("-m", "--max", dest="max", type="int", default=-1, help="Max number of combonations to generate")
+  parser.add_option("-f", "--file", dest="file", help="File containing parameters")
+  parser.add_option("--primer", dest="primer", default="AACCTT", help="Primer to use")  
 
   (options, args) = parser.parse_args()
-  dataPath = options.dir
-  comboLimit = options.max
-  
-  dispSeq = buildDispSeq(options.DispSeq)
+ 
+  if options.file:
+    #Use file for args
+    config = ConfigParser.RawConfigParser()
+    config.read(options.file)
+    dataPath = config.get("params", "path")
+    comboLimit = config.getint("params", "max")
+    primerSequence = config.get("params", "primer")
+    inDispSeq = config.get("params", "DispSeq")
+  else:
+    #Use command line args
+     dataPath = options.dir
+     comboLimit = options.max
+     inDispSeq = options.DispSeq
+     primerSequence = options.primer
+
+  # detect pycuda support
+  if cuda_support:
+     print "PyCUDA detected"
+  else:
+     print('PyCUDA not detected. Calculating the Pearson correlation matrix for lots')
+     print('of strains might take... oh... a century or two. A real-life renactment')
+     print('of "99 Bottles of Beer on the Wall" is recommended to pass the time.')
+
+  dispSeq = buildDispSeq(inDispSeq)
   
   #Find all files in Dir
   path = dataPath
