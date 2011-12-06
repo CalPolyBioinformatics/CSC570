@@ -29,6 +29,9 @@ pyro_ds_name = "ModTCGA-2c"
 global pyro_dis_seq
 pyro_dis_seq = []
 number_samples = 20
+db_num_opts = 7      # The number of opterons in a pyrorun from the database
+
+# For Parsing Opteron Files and Building the Graph 
 global num_opts
 opteron_size = 104
 
@@ -39,7 +42,11 @@ graph_disp_seq = "AACACGCGAGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG
 def main():
    global con
 
-   opts = parseData(sys.argv[1])
+   try:
+      opts = parseData(sys.argv[1])
+   except IndexError:
+      print "Usage: ./insilico.py <opterons.opt>"
+      return
 
    con = pymysql.connect(host = ghost, port = gport, user = guser, passwd = gpasswd, db = gdb_name)
 
@@ -75,7 +82,7 @@ def parseData(filename):
             # IF this is an opteron
             if  opt[0] != '#' :
                 # Add to the list
-                optList.append(opt)
+                optList.append(opt[0:104])
                 num_opts += 1
 
     return optList
@@ -138,12 +145,12 @@ def getPeakHeightCompensations():
             try:
                # Compute the unit value for this peak height given the number of opterons
                # NOTE: you must convert the peak height 'h' to a float!
-               phc_dict[n].append(float(h) / (num_opts * (int(math.ceil(h)) / num_opts)))
+               phc_dict[n].append(float(h) / (db_num_opts * (int(math.ceil(h)) / db_num_opts)))
             except ZeroDivisionError:
                # if the peak height is smaller than the number of opterons
                # it could be the case that the unit value for this nucleotide
                #  is less than 1, in this case we do a straight division
-               phc_dict[n].append(float(h) / num_opts)
+               phc_dict[n].append(float(h) / db_num_opts)
 
    cur.close()
 
@@ -328,34 +335,53 @@ def graph(opterons, tbl, pyro_dis_seq):
     outputList = []
     fd = open("pyroprint.out", "w")
 
-    # FOR each position
-    for i in range(0, opteron_size) :
+#    print dSeq
+#    print graph_disp_seq
+#    for opt in opterons:
+#      print opt
 
-        # Declare a nucleotide counter
+    for i in range(0, opteron_size):
+        nuc = dispSeq[i]
         nucleotidesCounted = 0
-
-        # Get the next nucleotide from the dispensation sequence
-        dispSeqNuc = dispSeq[i]
-
-        # FOR each opteron
-        for opt in opterons :
-            # Set a temporary index to the current position (i.e. i)
-            j = i
-
-            # WHILE each nucleotide matches the dispSeqNucleotide
-            while opt[j] == dispSeqNuc :
-                # Increment the number of nucleotides counted
+        for j in range(0, num_opts):
+            while opterons[j][0] == nuc:
                 nucleotidesCounted += 1
-                # Move the temporary index ahead one position
-                j += 1
-
-        print "nucleotides counted: " + str(nucleotidesCounted)
+#                print "nuc(" + nuc + ") opterons[" + str(j) + "]: " + opterons[j]
+                opterons[j] = opterons[j][1:len(opterons[j])]
+#                print "truncated opterons[" + str(j) + "]: " + opterons[j]
+                      
         # Multiply the number of nucelotides counted by the comp. peak height
-        ph = tbl[dSeq][i][dispSeqNuc][HEIGHT] * nucleotidesCounted
+        ph = tbl[dSeq][i][nuc][HEIGHT] * nucleotidesCounted
 
         # Add a tuple to the output list in format: (position, dispensation nucleotide, peak height value)
         #outputList.append( str(i) + ", " +  dispSeqNuc + ", "  + str(ph) + "\n")
-        fd.write(str(i) + "," + dispSeqNuc + "," + str(ph) + "\n")
+        fd.write(str(i) + "," + nuc + "," + str(ph) + "\n")
+
+    # FOR each position
+#    for i in range(0, opteron_size) :
+
+        # Declare a nucleotide counter
+#        nucleotidesCounted = 0
+
+        # Get the next nucleotide from the dispensation sequence
+#        dispSeqNuc = dispSeq[i]
+
+        # FOR each opteron
+#        for opt in opterons :
+            # Set a temporary index to the current position (i.e. i)
+#            j = i
+
+#            print "opt[" + str(j) + "] " + str(opt[j])
+#            print "dispSeqNuc " + dispSeqNuc
+
+            # WHILE each nucleotide matches the dispSeqNucleotide
+#            while opt[j] == dispSeqNuc :
+                # Increment the number of nucleotides counted
+#                nucleotidesCounted += 1
+                # Move the temporary index ahead one position
+#                j += 1
+
+ #       print "nucleotides counted: " + str(nucleotidesCounted)
 
     # Dump contents into an output file
 #    cPickle.dump(outputList, fd)
