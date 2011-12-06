@@ -62,6 +62,9 @@ def main():
 
    graph(opts, tbl, pyro_dis_seq)
 
+# Parses the file of opterons in filename.
+# @param filename - A newline-separated list of comments and opterons
+# RETURNS: A list of opertons
 def parseData(filename):
     global num_opts
     num_opts = 0
@@ -328,23 +331,43 @@ def averageHeights(dispSeq, sampleList, unitHeights, stdDev):
 
    return table
 
+# Parses the list of opterons and writes to pyroprint.csv with a list
+# of peak height values starting with position 0 and going until 
+# position 103. 
+# @param opterons - A list of opertons
+# @param tbl - A 4D table used in calculating the peak height values
+#              for the list of opterons
+# @param pyro_dis_seq - Used to index into the correct dispensation
+#                       sequence for the 4D table
 def graph(opterons, tbl, pyro_dis_seq):
     dispSeq = list(graph_disp_seq)
     dSeq = "".join(pyro_dis_seq)
-    fd = open("pyroprint.out", "w")
+    fd = open("pyroprint.csv", "w")
 
+    # FOR each position
     for i in range(0, opteron_size):
+
+        # Get the next nucleotide from the dispensation sequence
         nuc = dispSeq[i]
+
+        # Declare a nucleotide counter initialized to 0
         nucleotidesCounted = 0
+
+        # FOR each opteron
         for j in range(0, num_opts):
+
+            # WHILE each nucleotide matches the dispseq nucleotide
             while opterons[j][0] == nuc:
+                # Increment the number of nucleotides counted
                 nucleotidesCounted += 1
                 opterons[j] = opterons[j][1:len(opterons[j])]
                       
         # Multiply the number of nucelotides counted by the comp. peak height
         ph = tbl[dSeq][i][nuc][HEIGHT] * nucleotidesCounted
-
+      
         # Add a tuple to the output list in format: (position, dispensation nucleotide, peak height value)
+        # Uncomment and use to include position and nucleotide character
+            # fd.write(str(i) + ", " + str(nuc) + ", ")
         fd.write(str(ph) + ",")
 
 if __name__ == "__main__":
