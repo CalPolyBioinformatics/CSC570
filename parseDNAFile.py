@@ -65,8 +65,8 @@ def main():
   helpmsg = "Takes Genome Sequences from DIR and generates all posible pyroprints.\nThen produces a pearson correlation and displays the results"
   parser = OptionParser(usage=helpmsg)
   parser.add_option("-p", "--path", dest="dir", default="Genome Sequences/rDNA plasmid sequences/23-5/", help="Path to Genome Sequence Folders")
-  parser.add_option("-d", dest="DispSeq", default="AACACGCGA23(GATC)GAA", help="Dispination order")
-  parser.add_option("-m", "--max", dest="max", type="int", default=-1, help="Max number of combonations to generate")
+  parser.add_option("-d", dest="DispSeq", default="AACACGCGA23(GATC)GAA", help="Dispensation order")
+  parser.add_option("-m", "--max", dest="max", type="int", default=-1, help="Max number of combinations to generate")
   parser.add_option("-f", "--file", dest="file", help="File containing parameters")
   parser.add_option("--primer", dest="primer", default="AACCTT", help="Primer to use")  
 
