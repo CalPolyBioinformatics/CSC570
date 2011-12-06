@@ -249,6 +249,8 @@ def main():
         print 'Saving frame', fname
         fig.savefig(fname)
 
+# Builds the whole dispensation order string from the string seqExp
+# seqExp should be in the format of [StartSeq](NumRepeat)[RepeatedSeq]
 def buildDispSeq(seqExp):
         seq = re.findall('[a-zA-Z]+|\d+\([a-zA-Z]+\)',seqExp)
         
@@ -373,7 +375,8 @@ def getIterLength(iterator):
 #      print "Seq"
 #  #TODO finish this code
   
-
+# Produces all the Chose(total,r) combonations
+# Used to produce all posible pryoprints
 def combinations_with_replacement(iterable, r):
   # combinations_with_replacement('ABC', 2) --> AA AB AC BB BC CC
   pool = tuple(iterable)
@@ -391,6 +394,9 @@ def combinations_with_replacement(iterable, r):
     indices[i:] = [indices[i] + 1] * (r - i)
     yield tuple(pool[i] for i in indices)
 
+# The pearson correlation CUDA kernal
+# Does the pearson correlation of all the pryoprints on the GPU
+# and reports the number of pyroprints within each range
 def cuda_pearson(pyroprints, num_buckets):
     kernel = pycuda.compiler.SourceModule('''
         __global__ void pearson(int *buckets, int num_buckets,
@@ -487,7 +493,7 @@ def cuda_pearson(pyroprints, num_buckets):
 
     return buckets
 
-
+# Takes output from pearson_kernel and displays a graph of the results
 def cuda_plot(buckets):
     # merge into 6 bins as follows:
     #   0: 0.997 -> 1.000
