@@ -271,16 +271,28 @@ def printTable(table):
          print(" | "+str(table[dispSeq][i])+" | ")
       print("\n")
 
+# Creates a blank slot to put in a sample entry 
+# Each entry contains the current unit height (idx 0) and the total number 
+# of nucleotides seen (idx 1)
+# RETURNS a new slot
 def blankSlot():
    heightEntry = [0,0]
    return {"A": heightEntry, "G": heightEntry, "C": heightEntry, "T": heightEntry}
 
+# Creates a list to use as a "sample". The size of the empty sample created is 
+# DEFAULT_SAMPLE_SIZE which is defined at the top of this file 
+# RETURNs a list of dictionaries of lists (a new sample)
 def createTableEntry():
    entry = []
    for i in range(DEFAULT_SAMPLE_SIZE):
       entry.append(blankSlot())
    return entry
 
+# Handles the unit height calculation for a single sample. Calculates the 
+# average height for each position in a sample and keeps count of the total 
+# number of nucleotides of a particular letter at the position
+# When the algorithm completes, the entry in the table for the sample is updated 
+# with the calculated values  
 def avgHeights(table, dispSeq, smpl, unitHeights, stdDev):
    dSeq = "".join(dispSeq)
 

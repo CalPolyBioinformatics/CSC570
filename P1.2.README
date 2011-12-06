@@ -19,6 +19,10 @@ Source File List:
       * The main file. Parses the opterons, builds the table, and constructs the pyroprint.
          The resulting pyroprint is written to the file "pyroprint.out" in the current
          working directory. Format for the output is a CSV file.
+      * A serialized copy of the last builds of the unit averages table is persisted in the
+         'pyroprintTrends.pkl' file using Python cPickle. If the file is located in the current
+         directory, it is loaded before construction of the table starts, and its data combined
+         with future results. 
 
    - *.opts
       * Various Combinations of Opterons taken from
