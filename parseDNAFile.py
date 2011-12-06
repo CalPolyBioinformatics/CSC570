@@ -131,12 +131,10 @@ def main():
   for sequence in allSequences:
     #find primer
     if primer in sequence:
-      #Current sequence position
       seqCount = 0
-      #Current disposition
       dispCount = 0
       primerLoc = sequence.find(primer)
-      #get next 104 dispensations
+      #get next X dispensations(X = length of the dispensation sequence(def 104) - will make a pyroprint the length of the dispensation sequence)
       while dispCount < len(dispSeq):
         if sequence[primerLoc+len(primerSequence)+seqCount] == dispSeq[dispCount]:
           seqCount += 1
@@ -145,6 +143,7 @@ def main():
           dispCount += 1
         else:
             dispCount += 1
+      #add sequence to the list
       seqList.append(sequence[primerLoc+len(primerSequence):primerLoc+len(primerSequence)+seqCount])
 
 
@@ -154,7 +153,8 @@ def main():
     if oneSeq not in uniqueSequences:
       uniqueSequences.append(oneSeq)
   allCombinations = combinations_with_replacement(uniqueSequences,7)
-  
+
+
   print "Pyroprinting Sequences"
 
   #find all combinations
@@ -267,6 +267,13 @@ def buildDispSeq(seqExp):
 
         return complete
 
+
+#Generates a pyroprint.
+#Input: oneCombo - A single combination of 7 sequences, used to generate the pyroprint.
+#Input: dispSeq  - The current dispensation sequence, can be changed from the command line.
+#This is done by iterating through the entire dispensation sequence and getting the "heights" at that dispensation.
+#The heights are a count of how many of the next characters in the sequence are the current dispensation.
+#All 7 heights are added up to get the final simulated pyroprint.
 def pyroprintData(oneCombo, dispSeq):
   sequence = oneCombo
   
@@ -307,10 +314,11 @@ def pyroprintData(oneCombo, dispSeq):
     t += 1
   
   seqCount = 0
+
   #Get the max length of the heights (since they can be different - finish quicker/slower)
   maxVal = max(len(pyroData[0]),len(pyroData[1]),len(pyroData[2]),len(pyroData[3]),len(pyroData[4]),len(pyroData[5]),len(pyroData[6]))
   
-  #Pad the heights that do not have 0's that need them for adding
+  #Pad the heights that do not have 0's that need them for adding (to make all the lengths the same)
   x=0
   while x < 7:
     t = len(pyroData[x])
@@ -320,7 +328,7 @@ def pyroprintData(oneCombo, dispSeq):
     x += 1
   
   
-  #Get the final heights
+  #Get the final heights (the pyroprint!)
   while seqCount < len(dispSeq):
     height.append( int(pyroData[0][seqCount]) + int(pyroData[1][seqCount]) + int(pyroData[2][seqCount]) + int(pyroData[3][seqCount]) + int(pyroData[4][seqCount]) + int(pyroData[5][seqCount]) + int(pyroData[6][seqCount]))
     seqCount += 1
@@ -328,6 +336,7 @@ def pyroprintData(oneCombo, dispSeq):
   
   return height
 
+#Get the length of the iterator
 def getIterLength(iterator):
   temp = list(iterator)
   result = len(temp)

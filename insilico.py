@@ -5,7 +5,6 @@ import string
 import random
 import sys
 import math
-import pyroPrint
 import cPickle
 
 DEFAULT_SLOTS = 4000 # Default "length" of pyroprints to keep track of
@@ -29,6 +28,9 @@ pyro_ds_name = "ModTCGA-2c"
 global pyro_dis_seq
 pyro_dis_seq = []
 number_samples = 20
+db_num_opts = 7      # The number of opterons in a pyrorun from the database
+
+# For Parsing Opteron Files and Building the Graph 
 global num_opts
 opteron_size = 104
 
@@ -38,15 +40,19 @@ graph_disp_seq = "AACACGCGAGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG
 
 def main():
    global con
-   
-   opts = parseData(sys.argv[1])
-   
+
+   try:
+      opts = parseData(sys.argv[1])
+   except IndexError:
+      print "Usage: ./insilico.py <opterons.opt>"
+      return
+
    con = pymysql.connect(host = ghost, port = gport, user = guser, passwd = gpasswd, db = gdb_name)
 
    getPyroDispensationSeq()
    sdata = getSampleData()
 
-   # Get the Unit Heights for each nucleotide (phcomps) and the standard dev for 
+   # Get the Unit Heights for each nucleotide (phcomps) and the standard dev for
    #     each nucleotide's unit value
    (phcomps, stdDevs) = getPeakHeightCompensations()
    con.close()
@@ -75,7 +81,7 @@ def parseData(filename):
             # IF this is an opteron
             if  opt[0] != '#' :
                 # Add to the list
-                optList.append(opt)
+                optList.append(opt[0:104])
                 num_opts += 1
 
     return optList
@@ -138,12 +144,12 @@ def getPeakHeightCompensations():
             try:
                # Compute the unit value for this peak height given the number of opterons
                # NOTE: you must convert the peak height 'h' to a float!
-               phc_dict[n].append(float(h) / (num_opts * (int(math.ceil(h)) / num_opts)))
+               phc_dict[n].append(float(h) / (db_num_opts * (int(math.ceil(h)) / db_num_opts)))
             except ZeroDivisionError:
                # if the peak height is smaller than the number of opterons
                # it could be the case that the unit value for this nucleotide
                #  is less than 1, in this case we do a straight division
-               phc_dict[n].append(float(h) / num_opts)
+               phc_dict[n].append(float(h) / db_num_opts)
 
    cur.close()
 
@@ -175,7 +181,7 @@ def getPeakHeightCompensations():
 
 # Connects to the database and retreives the samples to be used when
 #     building the table
-# RETURNS: a list of samples where a single sample is a list of peak heights 
+# RETURNS: a list of samples where a single sample is a list of peak heights
 #     for a single pyro run
 def getSampleData():
    samples = []         # A list of pyroprint samples from the DB
@@ -217,7 +223,7 @@ def getSampleData():
       # Create a new empty sample list
       sample = []
 
-      # FOR each peak height returned 
+      # FOR each peak height returned
       for (r,) in cur:
          # APPEND the peak height to the sample list
          # NOTE: you must convert the returned value to a float since
@@ -286,24 +292,18 @@ def avgHeights(table, dispSeq, smpl, unitHeights, stdDev):
          table[dSeq] = createTableEntry()
 
       totalVal = currAvg * totalSeen # undo averaging
-      print "smpl[" + str(idx) + "] " + str(smpl[idx])
-      print "unitHeights[" + str(letter) + "] " + str(unitHeights[letter])
-      print "smpl/uh " + str(smpl[idx]/unitHeights[letter])
-      print "round() " + str(round(smpl[idx]/unitHeights[letter]))
 
       numNucleotides = round(smpl[idx]/unitHeights[letter])
+      if numNucleotides < 1:
+            numNucleotides = 1
+
       calcUnitAvg = smpl[idx]/numNucleotides
-      
-      print "numNucs " + str(numNucleotides)
 
       if (abs(calcUnitAvg - unitHeights[letter]) > stdDev[letter]):
          numNucleotides = numNucleotides - 1
-      
-      print "totalVal " + str(totalVal)
-      print "totalSeen " + str(totalSeen)
-      print "numNucs " + str(numNucleotides)
+
       currAvg = (totalVal + smpl[idx]/numNucleotides) / (totalSeen + numNucleotides) # add a height and average
-      
+
       # Update values in list
       table[dSeq][idx][letter][HEIGHT] = currAvg
       table[dSeq][idx][letter][SEEN] = totalSeen + numNucleotides
@@ -330,38 +330,22 @@ def averageHeights(dispSeq, sampleList, unitHeights, stdDev):
 
 def graph(opterons, tbl, pyro_dis_seq):
     dispSeq = list(graph_disp_seq)
-    outputList = []
+    dSeq = "".join(pyro_dis_seq)
     fd = open("pyroprint.out", "w")
 
-    # FOR each position
-    for i in range(0, opteron_size) :
-
-        # Declare a nucleotide counter
+    for i in range(0, opteron_size):
+        nuc = dispSeq[i]
         nucleotidesCounted = 0
-
-        # Get the next nucleotide from the dispensation sequence
-        dispSeqNuc = dispSeq[i % 4]
-
-        # FOR each opteron
-        for opt in opterons :
-            # Set a temporary index to the current position (i.e. i)
-            j = i
-
-            # WHILE each nucleotide matches the dispSeqNucleotide
-            while opt[j] == dispSeqNuc :
-                # Increment the number of nucleotides counted
+        for j in range(0, num_opts):
+            while opterons[j][0] == nuc:
                 nucleotidesCounted += 1
-                # Move the temporary index ahead one position
-                j += 1
-
+                opterons[j] = opterons[j][1:len(opterons[j])]
+                      
         # Multiply the number of nucelotides counted by the comp. peak height
-        ph = tbl[pyro_dis_seq][i][dispSeqNuc][HEIGHT] * nucleotidesCounted
+        ph = tbl[dSeq][i][nuc][HEIGHT] * nucleotidesCounted
 
         # Add a tuple to the output list in format: (position, dispensation nucleotide, peak height value)
-        outputList.append( str(i) + ", " +  dispSeqNuc + ", "  + str(ph) + "\n")
-
-    # Dump contents into an output file
-    cPickle.dump(outputList, fd)
+        fd.write(str(ph) + ",")
 
 if __name__ == "__main__":
    main()

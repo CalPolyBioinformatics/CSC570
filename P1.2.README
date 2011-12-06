@@ -1,0 +1,54 @@
+Part 1.2 README
+
+Contributors:
+   - Matt Carson
+   - Dirk Cummings
+   - Connor Lange
+
+Project Programming Language(s):
+   - Python
+
+Project Structure:
+
+
+Source File List:
+   - insilico.py
+      * The main file. Parses the opterons, builds the table, and constructs the pyroprint.
+         The resulting pyroprint is written to the file "pyroprint.out" in the current
+         working directory. Format for the output is a CSV file as follows:
+
+         <position>,<nucleotide dispensed>,<resulting peak height value>
+         ...
+
+   - pyroPrint.py
+      *
+
+   - *.opts
+      * Various Combinations of Opterons taken from
+         ./Genome Sequences/plasemid ratio tests/12-15-10 plasmid ratios-ModGATC-2controls.xls
+         and
+         ./Genome Sequences/rDNA plasmid sequences/23-5/
+         used for testing the output of insilico.py. Each file is an input into
+         the program to be run "insilico" and generate a simulated pyroprint.
+
+Executables:
+   - insilico.py <opteron.opt>
+      * The current implementation takes only one parameter at run time and must
+         be a file of opterons in the format:
+         
+            # Comment
+            <opteron string>
+            # Comment
+            <opteron string>
+            ...
+      * Developed for Python Version 2.7
+      * Requires PyMySQL Version 0.5. Available at
+         https://github.com/petehunt/PyMySQL
+
+Known Bugs / Issues:
+   - The "insilico" pyroprint created by this program is not in the XML format
+      given.
+   - 
+
+Release / Licensing:
+
