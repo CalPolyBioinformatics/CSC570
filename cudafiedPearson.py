@@ -7,7 +7,7 @@ from scipy.stats.stats import pearsonr
 import time
 
 def main():
-    n = 512 # number of pyroprints
+    n = 2000 # number of pyroprints
     m = 104 # pyroprint length
 
     pyroprints = numpy.zeros(shape=(n, m), dtype=numpy.int32, order='C')
@@ -71,6 +71,9 @@ def compute_python(pyroprints, num_buckets):
                 buckets[num_buckets - 1] += 1
             elif bucket >= 1:
                 buckets[bucket - 1] += 1
+
+        progress = ((i * n) * 100) / (n * n)
+        print('%d%% complete' % progress)
     
     return buckets
 
@@ -162,6 +165,9 @@ def compute_cuda(pyroprints, num_buckets):
                            numpy.int32(n), numpy.int32(m),
                            block=(block_size, block_size, 1),
                            grid=(tile_size, tile_size))
+
+            progress = ((s * num_tiles + t) * 100) / (num_tiles * num_tiles)
+            print('%d%% complete' % progress)
 
     buckets_gpu.get(buckets)
     return buckets
