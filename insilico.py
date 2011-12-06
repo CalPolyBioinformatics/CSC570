@@ -5,7 +5,6 @@ import string
 import random
 import sys
 import math
-import pyroPrint
 import cPickle
 
 DEFAULT_SLOTS = 4000 # Default "length" of pyroprints to keep track of
@@ -332,13 +331,7 @@ def averageHeights(dispSeq, sampleList, unitHeights, stdDev):
 def graph(opterons, tbl, pyro_dis_seq):
     dispSeq = list(graph_disp_seq)
     dSeq = "".join(pyro_dis_seq)
-    outputList = []
     fd = open("pyroprint.out", "w")
-
-#    print dSeq
-#    print graph_disp_seq
-#    for opt in opterons:
-#      print opt
 
     for i in range(0, opteron_size):
         nuc = dispSeq[i]
@@ -346,45 +339,13 @@ def graph(opterons, tbl, pyro_dis_seq):
         for j in range(0, num_opts):
             while opterons[j][0] == nuc:
                 nucleotidesCounted += 1
-#                print "nuc(" + nuc + ") opterons[" + str(j) + "]: " + opterons[j]
                 opterons[j] = opterons[j][1:len(opterons[j])]
-#                print "truncated opterons[" + str(j) + "]: " + opterons[j]
                       
         # Multiply the number of nucelotides counted by the comp. peak height
         ph = tbl[dSeq][i][nuc][HEIGHT] * nucleotidesCounted
 
         # Add a tuple to the output list in format: (position, dispensation nucleotide, peak height value)
-        #outputList.append( str(i) + ", " +  dispSeqNuc + ", "  + str(ph) + "\n")
-        fd.write(str(i) + "," + nuc + "," + str(ph) + "\n")
-
-    # FOR each position
-#    for i in range(0, opteron_size) :
-
-        # Declare a nucleotide counter
-#        nucleotidesCounted = 0
-
-        # Get the next nucleotide from the dispensation sequence
-#        dispSeqNuc = dispSeq[i]
-
-        # FOR each opteron
-#        for opt in opterons :
-            # Set a temporary index to the current position (i.e. i)
-#            j = i
-
-#            print "opt[" + str(j) + "] " + str(opt[j])
-#            print "dispSeqNuc " + dispSeqNuc
-
-            # WHILE each nucleotide matches the dispSeqNucleotide
-#            while opt[j] == dispSeqNuc :
-                # Increment the number of nucleotides counted
-#                nucleotidesCounted += 1
-                # Move the temporary index ahead one position
-#                j += 1
-
- #       print "nucleotides counted: " + str(nucleotidesCounted)
-
-    # Dump contents into an output file
-#    cPickle.dump(outputList, fd)
+        fd.write(str(ph) + ",")
 
 if __name__ == "__main__":
    main()
