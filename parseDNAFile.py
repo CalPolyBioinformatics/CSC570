@@ -46,14 +46,9 @@ try:
 except:
    pass
 
-####CHANGE THESE VALUES TO CHANGE HOW THE PROGRAM RUNS
-###DIRECTORY WITH DATA FILES:
 ###PRIMER
 #16-23 primer GGAACCTGCGGTTGGATCAC
 #23-5 primer CGTGAGGCTTAACCTT
-#primerSequence = "GGAACCTGCGGTTGGATCAC"
-primerSequence = "TTGGATCAC"
-#primerSequence = "AACCTT"
 
 ##Dispensation Sequence:
 #23-5 AACACGCGA23(GATC)GAA
@@ -77,7 +72,12 @@ def main():
     config = ConfigParser.RawConfigParser()
     config.read(options.file)
     dataPath = config.get("params", "path")
-    comboLimit = config.getint("params", "max")
+    
+    if config.has_option("params", "max"):
+       comboLimit = config.getint("params", "max")
+    else:
+       comboLimit = -1
+
     primerSequence = config.get("params", "primer")
     inDispSeq = config.get("params", "DispSeq")
   else:
@@ -87,7 +87,7 @@ def main():
      inDispSeq = options.DispSeq
      primerSequence = options.primer
 
-  # detect pycuda support
+  #Detect pycuda support
   if cuda_support:
      print "PyCUDA detected"
   else:
@@ -95,6 +95,7 @@ def main():
      print('of strains might take... oh... a century or two. A real-life renactment')
      print('of "99 Bottles of Beer on the Wall" is recommended to pass the time.')
 
+  #Build complete sequence string from input
   dispSeq = buildDispSeq(inDispSeq)
   
   #Find all files in Dir
@@ -160,7 +161,9 @@ def main():
   #find all combinations
   numCombos = 0
   allPyroPrints = []
-
+  
+  print "Total Combos " + str(len(uniqueSequences))
+ 
   for oneCombo in allCombinations:
 
     if comboLimit > 0 and numCombos >= comboLimit:
@@ -184,34 +187,16 @@ def main():
   else:
     for i in range(0, len(allPyroPrints)-1):
       for j in range(i+1,len(allPyroPrints)-1):
-        '''print 'allPyroPrints[i]'
-        print allPyroPrints[i]
-        print 'allPyroPrints[j]'
-        print allPyroPrints[j]
-        print 'i'
-        print i 
-        print 'j'
-        print j''' 
+        
         currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[j])[0]
         if(math.isnan(currPearsonR)!=True):
            if(currPearsonR < smallestPCor):
               smallestPCor = currPearsonR
+
            if(currPearsonR > largestPCor):
               largestPCor = currPearsonR
+
            allPCorrs.append(currPearsonR)
-        # for onePyroPrints in allPyroPrints:
-        #if numCombos%1000 = 0 
-        #print scipy.stats.pearsonr(onePyroPrints,lastPyroprint)
-        #print "New Pyroprints"
-        #print len(allPyroPrints[i])
-        #print len(allPyroPrints[i+1])
-        '''if(len(allPyroPrints[i]) == len(allPyroPrints[i+1])):
-          currPearsonR = pearsonr(allPyroPrints[i],allPyroPrints[i+1])[0]
-          if(currPearsonR < smallestPCor):
-            smallestPCor = currPearsonR
-          if(currPearsonR > largestPCor):
-            largestPCor = currPearsonR
-        allPCorrs.append(currPearsonR)  '''
 
         mu, sigma = 100, 15
         #x = mu + sigma * np.random.randn(10000)
@@ -329,12 +314,10 @@ def pyroprintData(oneCombo, dispSeq):
       t += 1
     x += 1
   
-  
-  #Get the final heights (the pyroprint!)
+  #Get the final heights
   while seqCount < len(dispSeq):
     height.append( int(pyroData[0][seqCount]) + int(pyroData[1][seqCount]) + int(pyroData[2][seqCount]) + int(pyroData[3][seqCount]) + int(pyroData[4][seqCount]) + int(pyroData[5][seqCount]) + int(pyroData[6][seqCount]))
     seqCount += 1
-  
   
   return height
 
