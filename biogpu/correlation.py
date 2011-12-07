@@ -4,7 +4,7 @@ import numpy
 import pycuda.autoinit
 import pycuda.compiler
 import pycuda.gpuarray
-import pycuda.driver as cuda
+import pycuda.driver
 
 # This expects the pyroprints argument to be a list of lists. It computes the
 # Pearson correlation against itself. It also assumes each sub-list is the same
@@ -47,8 +47,8 @@ def pearson(pyroprints, num_buckets, show_progress = True):
                 numpy.put(B[i], range(m), pyroprints[(t * tile_size * block_size) + i])
 
             pearson_kernel(buckets_gpu.gpudata, numpy.int32(num_buckets),
-                           cuda.In(A), numpy.int32(num_A),
-                           cuda.In(B), numpy.int32(num_B),
+                           pycuda.driver.In(A), numpy.int32(num_A),
+                           pycuda.driver.In(B), numpy.int32(num_B),
                            numpy.int32(s), numpy.int32(t),
                            numpy.int32(n), numpy.int32(m),
                            block=(block_size, block_size, 1),
