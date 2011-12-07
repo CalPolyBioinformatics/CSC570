@@ -1,28 +1,34 @@
+#include <stdint.h>
+
 __global__ void pearson(int *buckets, int num_buckets,
-                        int *A, int num_A, int *B, int num_B,
+                        float *A, int num_A, float *B, int num_B,
                         int s, int t, int n, int m) {
-    // calculate relative <i, j> coords within this tile
-    int i = blockIdx.y * blockDim.y + threadIdx.y; // row
-    int j = blockIdx.x * blockDim.x + threadIdx.x; // column
+    // Calculate relative <i, j> coords within this tile.
+    uint32_t i = blockIdx.y * blockDim.y + threadIdx.y; // row
+    uint32_t j = blockIdx.x * blockDim.x + threadIdx.x; // column
 
-    // calculate the offsets based on the tile number
-    int i_offset = s * gridDim.y * blockDim.y;
-    int j_offset = t * gridDim.x * blockDim.x;
+    // Calculate the offsets based on the tile number.
+    uint32_t i_offset = s * gridDim.y * blockDim.y;
+    uint32_t j_offset = t * gridDim.x * blockDim.x;
 
-    // make sure this thread is inside the matrix
-    if (i + i_offset >= n ||
-        j + j_offset >= n) {
+    // Calculate the absolute <i, j> coords within the matrix.
+    uint64_t i_abs = i_offset + i;
+    uint64_t j_abs = j_offset + j;
+
+    // Quick checks to bail out. Only compute values inside the bounds of the
+    // matrix, and above the diagonal.
+    if (i_abs >= n || j_abs >= n || i_abs >= j_abs) {
         return;
     }
 
-    // initialize accumulators and result
+    // Initialize accumulators and the result.
     float sum_x, sum_y, sum_x2, sum_y2, sum_xy, coeff;
     sum_x = sum_y = sum_x2 = sum_y2 = sum_xy = coeff = 0.0f;
 
-    // compute the sums
+    // Compute the sums.
     for (int k = 0; k < m; k++) {
-        int x = A[i * m + k];
-        int y = B[j * m + k];
+        float x = A[i * m + k];
+        float y = B[j * m + k];
 
         sum_x += x;
         sum_y += y;
@@ -31,12 +37,12 @@ __global__ void pearson(int *buckets, int num_buckets,
         sum_xy += x * y;
     }
 
-    // compute the pearson coefficient using the "sometimes numerically
-    // unstable" method because it's way more computationally efficient
+    // Compute the Pearson coefficient using the "sometimes numerically
+    // unstable" method because it's way more computationally efficient.
     coeff = (m * sum_xy - sum_x * sum_y) /
             sqrtf((m * sum_x2 - sum_x * sum_x) * (m * sum_y2 - sum_y * sum_y));
 
-    // dump it in the appropriate bucket
+    // Dump it in the appropriate bucket.
     int bucket = (int)(coeff * num_buckets);
     if (bucket >= num_buckets) {
         atomicAdd(&(buckets[num_buckets - 1]), 1);

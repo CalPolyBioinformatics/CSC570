@@ -34,7 +34,7 @@ def pearson(pyroprints, num_buckets, show_progress = True):
             remain_A = n - (s * tile_size * block_size)
             num_A = num_A if num_A < remain_A else remain_A
 
-            A = numpy.zeros(shape=(num_A, m), dtype=numpy.int32, order='C')
+            A = numpy.zeros(shape=(num_A, m), dtype=numpy.float32, order='C')
             for i in range(num_A):
                 numpy.put(A[i], range(m), pyroprints[(s * tile_size * block_size) + i])
 
@@ -42,7 +42,7 @@ def pearson(pyroprints, num_buckets, show_progress = True):
             remain_B = n - (t * tile_size * block_size)
             num_B = num_B if num_B < remain_B else remain_B
 
-            B = numpy.zeros(shape=(num_B, m), dtype=numpy.int32, order='C')
+            B = numpy.zeros(shape=(num_B, m), dtype=numpy.float32, order='C')
             for i in range(num_B):
                 numpy.put(B[i], range(m), pyroprints[(t * tile_size * block_size) + i])
 
@@ -55,7 +55,7 @@ def pearson(pyroprints, num_buckets, show_progress = True):
                            grid=(tile_size, tile_size))
 
             if show_progress:
-                progress = (s * num_tiles + t) * 100.0 / (num_tiles * num_tiles)
+                progress = (s * num_tiles + t) * 100 / (num_tiles * num_tiles)
                 sys.stdout.write('\rComputing correlations %.3f%%' % progress)
                 sys.stdout.flush()
 
