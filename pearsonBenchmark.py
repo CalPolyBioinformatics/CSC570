@@ -1,48 +1,53 @@
 import sys
-import numpy
+import numpy as np
 from scipy.stats.stats import pearsonr
 import biogpu.correlation
 import time
 
 def main():
-    n = 512 # number of pyroprints
-    m = 104 # pyroprint length
-    #n = 10
-    #m = 104
+    n = 6 # length of X
+    m = 4 # length of Y
+    p = 3 # pyroprint length
+    ranges = [(0.0, 0.33),
+              (0.33, 0.66),
+              (0.66, 1.0)]
 
-    pyroprints = numpy.zeros(shape=(n, m), dtype=numpy.float32, order='C')
+    A = np.zeros(shape=(n, p), dtype=np.float32, order='C')
+    B = np.zeros(shape=(m, p), dtype=np.float32, order='C')
     for i in range(n):
-        numpy.put(pyroprints[i], range(m),
-                  numpy.random.rand(m).astype(numpy.float32))
+        np.put(A[i], range(p), np.random.rand(p).astype(np.float32))
 
-    print('Fake Pyroprints:')
-    print(pyroprints)
-    print('')
+    for i in range(m):
+        np.put(B[i], range(p), np.random.rand(p).astype(np.float32))
+
+    print('X:')
+    print(A)
+    print('\nY:')
+    print(B)
+    print('\n')
 
     print('=== Computing with Python/SciPy ===')
     python_start = time.time()
-    python_buckets = compute_python(pyroprints, 10000)
+    python_buckets = compute_python(A, B, ranges)
     python_end = time.time()
 
-    #print('Buckets (abridged):')
-    #for i in range(10000):
-    #    if python_buckets[i] > 0:
-    #        print('\t[%d] = %d' % (i, python_buckets[i]))
-    #print('\n')
+    print('Buckets:')
+    for i in range(len(python_buckets)):
+        print('\t[%d] (%.2f, %.2f) = %d' % (i, ranges[i][0], ranges[i][1], python_buckets[i]))
+    print('\n')
 
     python_time = python_end - python_start
     print('Computed in %f seconds.\n' % python_time)
 
     print('=== Computing with CUDA ===')
     cuda_start = time.time()
-    cuda_buckets = biogpu.correlation.pearson(pyroprints, 10000)
+    cuda_buckets = biogpu.correlation.pearson(A, B, ranges)
     cuda_end = time.time()
 
-    #print('Buckets (abridged):')
-    #for i in range(10000):
-    #    if cuda_buckets[i] > 0:
-    #        print('\t[%d] = %d' % (i, cuda_buckets[i]))
-    #print('\n')
+    print('Buckets:')
+    for i in range(len(cuda_buckets)):
+        print('\t[%d] (%.2f, %.2f) = %d' % (i, ranges[i][0], ranges[i][1], cuda_buckets[i]))
+    print('\n')
 
     cuda_time = cuda_end - cuda_start
     print('Computed in %f seconds.\n' % cuda_time)
@@ -52,29 +57,29 @@ def main():
 
     print('Done.')
 
-def compute_python(pyroprints, num_buckets):
-    n = len(pyroprints)
-    m = len(pyroprints[0])
+def compute_python(X, Y, ranges):
+    # Check some preconditions to verify we're doing something sensical.
+    # Doesn't cover all cases, but catches obvious mistakes.
+    assert len(X[0]) == len(X[1]), 'Your sequences in X should all be the same length.'
+    assert len(Y[0]) == len(Y[1]), 'Your sequences in Y should all be the same length.'
 
-    matrix = numpy.zeros(shape=(n, n), dtype=numpy.float32, order='C')
-    buckets = numpy.zeros(shape=(num_buckets, 1), dtype=numpy.int32, order='C')
+    # Create the correlation matrix and buckets.
+    matrix = np.zeros(shape=(len(X), len(Y)), dtype=np.float32, order='C')
+    buckets = np.zeros(shape=(len(ranges), 1), dtype=np.uint64, order='C')
 
-    num_cells = n * n * 0.5 - n
-    cell_count = 0
-    for i in range(n):
-        for j in range(n):
-            if i >= j:
-                continue
-            coeff, _ = pearsonr(pyroprints[i], pyroprints[j])
+    for i in range(len(X)):
+        for j in range(len(Y)):
+            # Compute the coefficient.
+            coeff, _ = pearsonr(X[i], Y[j])
             matrix[i][j] = coeff
-            bucket = int(coeff * num_buckets)
-            if bucket >= num_buckets:
-                buckets[num_buckets - 1] += 1
-            elif bucket >= 1:
-                buckets[bucket - 1] += 1
-            cell_count += 1
 
-        progress = cell_count / num_cells * 100
+            # Drop it in appropriate bucket.
+            for k in range(len(ranges)):
+                low, high = ranges[k]
+                if coeff >= low and coeff < high:
+                    buckets[k] += 1
+
+        progress = float((i * len(Y)) + j) / len(X) * len(Y) * 100.0
         sys.stdout.write('\rComputing correlations %.3f%%' % progress)
         sys.stdout.flush()
 
