@@ -58,7 +58,7 @@ def main():
    con.close()
 
    tbl = averageHeights(pyro_dis_seq, sdata, phcomps, stdDevs)
-   printTable(tbl)
+   # printTable(tbl)
 
    graph(opts, tbl, pyro_dis_seq)
 
@@ -138,6 +138,10 @@ def getPeakHeightCompensations():
 
       cur.execute(sql)
 
+      j = 1
+      (basen,baseh) = cur.fetchone()
+      baseh = float(baseh)
+      phc_dict[basen].append(baseh / db_num_opts)
       # FOR each nucleotide-peak height pair
       for (n,h) in cur:
          # IF the height was less than one, junk data and discard
@@ -147,12 +151,23 @@ def getPeakHeightCompensations():
             try:
                # Compute the unit value for this peak height given the number of opterons
                # NOTE: you must convert the peak height 'h' to a float!
-               phc_dict[n].append(float(h) / (db_num_opts * (int(math.ceil(h)) / db_num_opts)))
+               multi = 1
+               while (baseh * multi) / float(h) < 1:
+#                  print str(multi + 1) + " " + str((baseh * multi) / (float(h)))
+                  multi += 1
+
+#               print (str(j) + " " + n + "(" + str(float(h)) + ") / 7 * " + str(multi) + ": " 
+#                     + str(float(h) / (db_num_opts * multi)))
+#               print "  " + basen + " baseh(" + str(baseh) + ") / h(" + str(float(h)) + "): " + str(baseh / float(h))
+               phc_dict[n].append(float(h) / (db_num_opts * multi));
+               # phc_dict[n].append(float(h) / (db_num_opts * (int(math.ceil(h)) / db_num_opts)))
             except ZeroDivisionError:
                # if the peak height is smaller than the number of opterons
                # it could be the case that the unit value for this nucleotide
                #  is less than 1, in this case we do a straight division
                phc_dict[n].append(float(h) / db_num_opts)
+
+         j+= 1
 
    cur.close()
 
