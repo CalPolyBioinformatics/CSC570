@@ -79,7 +79,8 @@ __global__ void pearson(uint64_t *buckets,
     coeff = (p * sum_xy - sum_x * sum_y) /
             sqrtf((p * sum_x2 - sum_x * sum_x) * (p * sum_y2 - sum_y * sum_y));
 
-    // Dump it in the appropriate bucket.
+    // Dump it in the appropriate bucket. Buckets are allowed to overlap, so
+    // we need to check all of them.
     for (uint32_t k = 0; k < num_ranges; k++) {
         float low = ranges[2 * k + 0];
         float high = ranges[2 * k + 1];
