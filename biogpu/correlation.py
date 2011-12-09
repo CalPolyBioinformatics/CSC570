@@ -83,18 +83,19 @@ def pearson(X, Y, ranges):
 
     # Do a parallel reduction to sum all the buckets element-wise.
     reduction_cuda(buckets_gpu.gpudata, np.uint32(len(ranges)),
-                   np.uint32(tile_size),
-                   block=(threads_per_block, threads_per_block, 1),
-                   grid=(blocks_per_tile, blocks_per_tile))
+                   np.uint32(tile_size), np.uint32(blocks_per_tile),
+                   block=(threads_per_block, 1, 1),
+                   grid=(tile_size, 1))
 
     # Copy buckets back from GPU.
     buckets_gpu.get(buckets)
 
-    # Copy the results of the reduction out of cell <0, 0>.
-    merged = []
-    for i in range(len(ranges)):
-        bucket_index = (tile_size * tile_size * i) + (tile_size * 0) + 0
-        merged.append(buckets[bucket_index])
+    # Merge the results of the reduction from the first column of the matrix.
+    merged = [0 for k in range(len(ranges))]
+    for k in range(len(ranges)):
+        for i in range(tile_size):
+            bucket_index = (tile_size * tile_size * k) + (tile_size * i) + 0
+            merged[k] += buckets[bucket_index]
     print('done.')
 
     return merged

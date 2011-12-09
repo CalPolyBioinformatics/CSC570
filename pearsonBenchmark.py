@@ -5,9 +5,9 @@ import biogpu.correlation
 import time
 
 def main():
-    n = 21 # length of X
-    m = 17 # length of Y
-    p = 3 # pyroprint length
+    n = 2121 # length of X
+    m = 1717 # length of Y
+    p = 104 # pyroprint length
     ranges = [(0.00, 0.15),
               (0.15, 0.30),
               (0.30, 0.45),

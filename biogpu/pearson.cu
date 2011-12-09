@@ -15,28 +15,25 @@ __device__ void dump_bucket(uint64_t *buckets,
 }
 
 __global__ void reduction(uint64_t *buckets, uint32_t num_ranges,
-                          uint32_t tile_size) {
+                          uint32_t tile_size, uint32_t chunk_size) {
     // Calculate <i, j> coords within the tile.
-    uint32_t i = blockIdx.y * blockDim.y + threadIdx.y; // row
-    uint32_t j = blockIdx.x * blockDim.x + threadIdx.x; // column
+    uint32_t i = blockIdx.x; // row
+    uint32_t j = threadIdx.x * chunk_size; // column
 
-    // Start with 2x2 reductions.
-    uint32_t size = 2;
-
-    // Keep reducing until everything has been reduced into cell <0, 0>.
-    while (size <= tile_size) {
-        if (i % size == 0 && j % size == 0) {
-            dump_bucket(buckets, num_ranges, tile_size,
-                        i + size / 2, j, i, j);
-            dump_bucket(buckets, num_ranges, tile_size,
-                        i, j + size / 2, i, j);
-            dump_bucket(buckets, num_ranges, tile_size,
-                        i + size / 2, j + size / 2, i, j);
-        }
-        size *= 2;
+    // Each chunk leader reduces its chunk.
+    for (uint32_t k = 1; k < chunk_size; k++) {
+        dump_bucket(buckets, num_ranges, tile_size, i, j + k, i, j);
     }
-    
-    // The results are in bucket <0, 0>!
+
+    // Wait for all the threads in this row to finish.
+    __syncthreads();
+
+    // Reduce each chunk leader into the zeroth element of the row.
+    if (j == 0) {
+        for (uint32_t k = 1; k < blockDim.x; k++) {
+            dump_bucket(buckets, num_ranges, tile_size, i, k * chunk_size, i, 0);
+        }
+    }
 }
 
 __global__ void pearson(uint64_t *buckets,
