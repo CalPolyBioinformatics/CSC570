@@ -14,13 +14,8 @@
   find all possible choose 7 combinations of unique sequences
   generate pyroprints (python)
   compare pyroprints
+  CUDA pearson correlation
   Graph pyroprints
-  TODO:
-  generate pyroprints (CUDA) -- Bob: I'm not sure it makes a whole lot of sense
-    to spend time writing a kernel for this. Since we're only talking about
-    pyroprinting ~ 20k-50k strains it only takes like, a minute tops.
-  calculate pearson correl (CUDA) -- Bob: This makes a lot of sense. The matrix
-    is 50k x 50k and takes lightyears in Python right now.
   """
 
 import sys
@@ -182,7 +177,22 @@ def main():
   print 'Calculating Pearson Correlation'
 
   if gpu_support:
-    buckets = biogpu.correlation.pearson(allPyroPrints, 10000)
+    ranges = [(0.000, 1.000), # Catch all... how many in total?
+              (0.900, 0.950), # 90.0% -> 95.0%
+              (0.950, 0.955), # 95.0% -> 95.5%
+              (0.955, 0.960), # 95.5% -> 96.0% 
+              (0.960, 0.965), # etc...
+              (0.965, 0.970),
+              (0.970, 0.975),
+              (0.975, 0.980),
+              (0.980, 0.985),
+              (0.985, 0.990),
+              (0.990, 1.000)]
+    buckets = biogpu.correlation.pearson(allPyroPrints, allPyroPrints, ranges)
+    print('Results:')
+    for i in range(len(buckets)):
+        print('\t[%d] (%.1f%%, %.1f%%) = %d' % (i, ranges[i][0] * 100.0, ranges[i][1] * 100.0, buckets[i]))
+    print('\n')
   else:
     for i in range(0, len(allPyroPrints)-1):
       for j in range(i+1,len(allPyroPrints)-1):
