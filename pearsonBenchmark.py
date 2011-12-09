@@ -5,12 +5,16 @@ import biogpu.correlation
 import time
 
 def main():
-    n = 6 # length of X
-    m = 4 # length of Y
+    n = 21 # length of X
+    m = 17 # length of Y
     p = 3 # pyroprint length
-    ranges = [(0.0, 0.33),
-              (0.33, 0.66),
-              (0.66, 1.0)]
+    ranges = [(0.00, 0.15),
+              (0.15, 0.30),
+              (0.30, 0.45),
+              (0.45, 0.60),
+              (0.60, 0.75),
+              (0.75, 0.90),
+              (0.90, 1.0)]
 
     A = np.zeros(shape=(n, p), dtype=np.float32, order='C')
     B = np.zeros(shape=(m, p), dtype=np.float32, order='C')
@@ -62,13 +66,18 @@ def compute_python(X, Y, ranges):
     # Doesn't cover all cases, but catches obvious mistakes.
     assert len(X[0]) == len(X[1]), 'Your sequences in X should all be the same length.'
     assert len(Y[0]) == len(Y[1]), 'Your sequences in Y should all be the same length.'
+    assert len(X[0]) == len(Y[0]), 'Your sequences in X and Y should all be the same length.'
+
+    n = len(X)
+    m = len(Y)
+    p = len(X[0])
 
     # Create the correlation matrix and buckets.
-    matrix = np.zeros(shape=(len(X), len(Y)), dtype=np.float32, order='C')
+    matrix = np.zeros(shape=(n, m), dtype=np.float32, order='C')
     buckets = np.zeros(shape=(len(ranges), 1), dtype=np.uint64, order='C')
 
-    for i in range(len(X)):
-        for j in range(len(Y)):
+    for i in range(n):
+        for j in range(m):
             # Compute the coefficient.
             coeff, _ = pearsonr(X[i], Y[j])
             matrix[i][j] = coeff
@@ -79,7 +88,7 @@ def compute_python(X, Y, ranges):
                 if coeff >= low and coeff < high:
                     buckets[k] += 1
 
-        progress = float((i * len(Y)) + j) / len(X) * len(Y) * 100.0
+        progress = (i * m) * 100.0 / (n * m)
         sys.stdout.write('\rComputing correlations %.3f%%' % progress)
         sys.stdout.flush()
 

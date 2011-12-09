@@ -29,8 +29,8 @@ def pearson(X, Y, ranges):
     # CUDA parameters that seem to work well. The number of threads per tile
     # (the tile_size) should be a power of 2 for the parallel reduction to
     # work right!
-    threads_per_block = 2
-    blocks_per_tile = 4
+    threads_per_block = 16
+    blocks_per_tile = 64
     tile_size = threads_per_block * blocks_per_tile
     num_tiles = (n / tile_size + 1, m / tile_size + 1)
 
