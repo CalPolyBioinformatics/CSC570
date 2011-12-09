@@ -11,6 +11,11 @@ def pearson(X, Y, ranges):
     # Doesn't cover all cases, but catches obvious mistakes.
     assert len(X[0]) == len(X[1]), 'Your sequences in X should all be the same length.'
     assert len(Y[0]) == len(Y[1]), 'Your sequences in Y should all be the same length.'
+    assert len(X[0]) == len(Y[0]), 'Your sequences in X and Y should all be the same length.'
+
+    n = len(X)
+    m = len(Y)
+    p = len(X[0])
 
     # Load the kernel and compile it.
     kernel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -24,10 +29,10 @@ def pearson(X, Y, ranges):
     # CUDA parameters that seem to work well. The number of threads per tile
     # (the tile_size) should be a power of 2 for the parallel reduction to
     # work right!
-    threads_per_block = 16
-    blocks_per_tile = 64
+    threads_per_block = 2
+    blocks_per_tile = 4
     tile_size = threads_per_block * blocks_per_tile
-    num_tiles = (len(X) / tile_size + 1, len(Y) / tile_size + 1)
+    num_tiles = (n / tile_size + 1, m / tile_size + 1)
 
     # Copy the ranges into a numpy array.
     ranges_np = np.zeros(shape=(len(ranges), 2), dtype=np.float32, order='C')
@@ -42,29 +47,29 @@ def pearson(X, Y, ranges):
 
     # Do a kernel launch for each tile, copying the appropriate chunks of the
     # input arrays into X and Y for each launch.
-    for s in range(num_tiles[1]):
-        for t in range(num_tiles[0]):
+    for s in range(num_tiles[0]):
+        for t in range(num_tiles[1]):
             num_A = tile_size
-            remain_Y = len(Y) - (s * tile_size)
-            num_A = num_A if num_A < remain_Y else remain_Y
+            remain_X = n - (s * tile_size)
+            num_A = num_A if num_A < remain_X else remain_X
 
-            A = np.zeros(shape=(num_A, len(Y[0])), dtype=np.float32, order='C')
+            A = np.zeros(shape=(num_A, p), dtype=np.float32, order='C')
             for i in range(num_A):
-                np.put(A[i], range(len(Y[0])), Y[(s * tile_size) + i])
+                np.put(A[i], range(p), X[(s * tile_size) + i])
 
             num_B = tile_size
-            remain_X = len(X) - (t * tile_size)
-            num_B = num_B if num_B < remain_X else remain_X
+            remain_Y = m - (t * tile_size)
+            num_B = num_B if num_B < remain_Y else remain_Y
 
-            B = np.zeros(shape=(num_B, len(X[0])), dtype=np.float32, order='C')
-            for i in range(num_B):
-                np.put(B[i], range(len(X[0])), X[(t * tile_size) + i])
+            B = np.zeros(shape=(num_B, p), dtype=np.float32, order='C')
+            for j in range(num_B):
+                np.put(B[j], range(p), Y[(t * tile_size) + j])
 
             pearson_cuda(buckets_gpu.gpudata,
                          pycuda.driver.In(ranges_np), np.uint32(len(ranges)),
                          pycuda.driver.In(A), pycuda.driver.In(B),
                          np.uint32(tile_size), np.uint32(s), np.uint32(t),
-                         np.uint32(len(X)), np.uint32(len(Y)), np.uint32(len(X[0])),
+                         np.uint32(n), np.uint32(m), np.uint32(p),
                          block=(threads_per_block, threads_per_block, 1),
                          grid=(blocks_per_tile, blocks_per_tile))
 
@@ -75,7 +80,8 @@ def pearson(X, Y, ranges):
     print('\rComputing correlations 100.000%')
     sys.stdout.write('Merging buckets... ')
     sys.stdout.flush()
-            
+
+    # Do a parallel reduction to sum all the buckets element-wise.
     reduction_cuda(buckets_gpu.gpudata, np.uint32(len(ranges)),
                    np.uint32(tile_size),
                    block=(threads_per_block, threads_per_block, 1),

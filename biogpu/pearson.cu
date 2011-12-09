@@ -33,7 +33,6 @@ __global__ void reduction(uint64_t *buckets, uint32_t num_ranges,
             dump_bucket(buckets, num_ranges, tile_size,
                         i + size / 2, j + size / 2, i, j);
         }
-
         size *= 2;
     }
     
@@ -57,9 +56,8 @@ __global__ void pearson(uint64_t *buckets,
     uint32_t i_abs = i_offset + i;
     uint32_t j_abs = j_offset + j;
 
-    // Quick checks to bail out. Only compute values inside the bounds of the
-    // matrix, and above the diagonal.
-    if (i_abs >= n || j_abs >= n || i_abs >= j_abs) {
+    // Only compute values inside the bounds of the matrix.
+    if (i_abs >= n || j_abs >= m) {
         return;
     }
 
@@ -69,8 +67,8 @@ __global__ void pearson(uint64_t *buckets,
 
     // Compute the sums.
     for (uint32_t k = 0; k < p; k++) {
-        float x = A[i * m + k];
-        float y = B[j * m + k];
+        float x = A[i * p + k];
+        float y = B[j * p + k];
 
         sum_x += x;
         sum_y += y;
